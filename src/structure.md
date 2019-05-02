@@ -1,3 +1,7 @@
+```{comment}
+https://github.com/jonschlinkert/remarkable#syntax-extensions
+```
+
 # Outline
 
 This is where I start
@@ -6,7 +10,7 @@ This is where I start
 
 The following is a simple command:
 
-```omd cc && a.out 10
+```{cc}
     #include <stdio.h>
     #include <stdlib.h>
     
@@ -15,14 +19,14 @@ The following is a simple command:
     }
 
     int main(int argc, char** argv) {
-      int n = atoi(argv[1]);
+      int n = atoi(argv[1]);11
       printf("fibonacci of %d is %d\n", n, fib(n));
     }
 ```
 
 This code is pretty straight forward - but what does it communicate?
 
-```omd
+```{dot}
 digraph finite_state_machine {
 	rankdir=LR;
 	size="8,5"

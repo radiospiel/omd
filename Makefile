@@ -1,2 +1,2 @@
-all:
-	scripts/processor process --dest=./out src/* 
+format:
+	rubocop -a bin/omd

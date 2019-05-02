@@ -2,6 +2,8 @@
 
 require "bundler/inline"
 
+# rubocop:disable Layout/MultilineMethodCallIndentation
+# rubocop:disable Style/GuardClause
 gemfile do
   source "https://rubygems.org"
   gem "rb-fsevent", require: false
@@ -26,9 +28,9 @@ module OMD::CLI
 
     raise "#{src}: missing or not a file" unless File.exist?(src) && File.file?(src)
     raise "#{dest}: must be a directory"  if File.exist?(dest) && !File.directory?(dest)
-    
-    src = File.expand_path (src)
-    dest = File.expand_path (dest)
+
+    src = File.expand_path(src)
+    dest = File.expand_path(dest)
     FileUtils.rm_rf(dest) if clean
     FileUtils.mkdir_p(dest)
 
@@ -44,6 +46,7 @@ module OMD::CLI
     fsevent = FSEvent.new
     fsevent.watch [__dir__, File.dirname(src)], latency: 0.1 do |dirs, event_meta|
       next unless detected_change?(dirs, event_meta, src_dir: File.dirname(src))
+
       OMD.process(src, dest)
     end
     fsevent.run
@@ -61,8 +64,14 @@ module OMD::CLI
     end
 
     if dirs.any? { |dir| dir.start_with?(src_dir) }
-      return true 
+      return true
     end
+  end
+end
+
+def File.write(path, body)
+  File.open(path, "w") do |io|
+    io.write(body)
   end
 end
 
@@ -73,27 +82,62 @@ module OMD
     OMD::CLI.logger
   end
 
+  class Writer
+    def self.open(path)
+      writer = new path
+      yield writer
+    ensure
+      writer.close if writer
+    end
+
+    def initialize(path)
+      @dir = File.dirname(path)
+      @fd = File.open path, "w"
+    end
+
+    def close
+      @fd.close
+      @fd = nil
+    end
+
+    def line(line)
+      @fd.puts line
+    end
+
+    def error(body)
+      code_block body, lang: "error"
+    end
+
+    def code_block(body, lang: nil)
+      @fd.puts <<~MD
+        ```#{lang}
+        #{body.chomp}
+        ```
+      MD
+    end
+  end
+
   # Process one or more input files, put results into dest
   def process(src, dest)
     logger.info "Processing #{src}"
 
     processing_time = nil
 
-    File.open(dest, "w") do |out|
+    Writer.open dest do |writer|
       processing_time = Benchmark.realtime do
         input = File.open src
 
         # read file line by line. Extract and yield omd blocks
-        while line = input.gets
-          unless line.start_with?("```")
-            out.puts line
+        while (line = input.gets)
+          unless line =~ /^```{\s*(.*)\s*}\s*$/
+            writer.line(line)
             next
           end
 
-          intro = line[3 .. -1]
+          omd_args = Regexp.last_match(1)
           # read until end of omd block
           code_block = []
-          while line = input.gets
+          while (line = input.gets)
             break if line.start_with?("```")
 
             code_block << line
@@ -101,12 +145,10 @@ module OMD
 
           code_block = code_block.join("")
           code_block = unintend(code_block)
-          
-          process_omd(intro, code_block, out: out)
+
+          process_omd(omd_args, code_block, writer: writer)
         end
       end
-
-      out.puts "\n> generated via OMD from #{src} in #{"%.3f secs" % processing_time}"
     end
 
     logger.info "generated #{dest} from #{src}: #{"%.3f secs" % processing_time}"
@@ -117,61 +159,70 @@ module OMD
       .split("\n")
 
     number_of_leading_spaces = code_block
-      .map { |line| /^( +)/.match(line) }
+      .map { |line| line =~ /^( +)/ && $1 }
       .compact
-      .map { |matches| matches[1].length }
+      .map(&:length)
       .min
 
     code_block
-      .map { |l| /^( +)/.match(l) ? l[number_of_leading_spaces..-1] : l }
-      .map { |l| "#{l}\n" }.join
+      .map { |line| line =~ /^ / ? line[number_of_leading_spaces..-1] : line }
+      .map { |line| "#{line}\n" }.join
   end
 
-  def print_code_block(code_block, lang: nil, out:)
-    out.puts <<~MD
-      ```#{lang}
-      #{code_block.chomp}
-      ```
-    MD
-  end
+  class ShellError < RuntimeError; end
 
-  def process_omd(_intro, code_block, out:)
-    r = []
+  module H
+    extend self
 
-    print_code_block code_block, lang: "c", out: out
+    def sh!(cmd)
+      OMD.logger.debug "Running #{cmd}"
+      stdout_str, stderr_str, status = Open3.capture3(cmd)
+      return stdout_str if status.exitstatus == 0
 
-    puts code_block
-    Dir.mktmpdir do |tmpdir|
-      Dir.chdir tmpdir do
-        File.open("omd.cc", "w") do |io|
-          io.write(code_block)
-        end
-
-        success, error = sh "cc -Wall omd.cc"
-        if error
-          print_code_block error, lang: "error", out: out
-          next
-        end
-
-        success, error = sh "./a.out 10"
-        if error
-          print_code_block error, lang: "error", out: out
-          next
-        end
-
-        print_code_block success, lang: "output", out: out
-      end
+      raise ShellError, stderr_str
     end
   end
 
-  def sh(cmd)
-    logger.debug "Running #{cmd}"
-    stdout_str, stderr_str, status = Open3.capture3(cmd)
-    if status.exitstatus == 0
-      [stdout_str, nil]
+  module Processors
+    extend self
+
+    def comment(intro, code_block, writer:); end
+
+    def dot(_intro, code_block, writer:)
+      File.write("omd.dot", code_block)
+
+      H.sh! "dot -Tpng -Gsize=16,16\! -Gdpi=72  -o dot.png omd.dot"
+
+      outpath = "/Users/eno/projects/omd/dest/outpath.png"
+      FileUtils.cp "dot.png", outpath
+      writer.line "![dot](./outpath.png)"
+    end
+
+    def cc(_intro, code_block, writer:)
+      writer.code_block code_block, lang: "c"
+
+      File.write("omd.cc", code_block)
+
+      H.sh! "cc -Wall omd.cc"
+
+      success = H.sh! "./a.out 10"
+      writer.code_block success
+    end
+  end
+
+  def process_omd(intro, code_block, writer:)
+    logger.warn "intro", intro
+
+    if Processors.respond_to?(intro)
+      Dir.mktmpdir do |tmpdir|
+        Dir.chdir tmpdir do
+          Processors.send intro, intro, code_block, writer: writer
+        rescue ShellError
+          writer.error($!.to_s)
+        end
+      end
     else
-      logger.warn "Running #{cmd} failed with exitstatus #{status.exitstatus}"
-      [nil, stderr_str]
+      writer.error "Unsupported omd processor #{intro.inspect}"
     end
   end
 end
