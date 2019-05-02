@@ -1,0 +1,1 @@
+./scripts/omd watch --clean src dest --no-display "$@" 

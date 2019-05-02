@@ -1,0 +1,182 @@
+#!/usr/bin/env ruby
+
+require "bundler/inline"
+
+gemfile do
+  source "https://rubygems.org"
+  gem "rb-fsevent", require: false
+  gem "simple-cli", require: false
+end
+
+require "simple-cli"
+require "fileutils"
+require "benchmark"
+require "tmpdir"
+require "open3"
+
+module OMD
+end
+
+module OMD::CLI
+  include ::Simple::CLI
+
+  # Watch src directory, and rebuild into dest directory
+  def watch(src, dest, clean: false, display: true)
+    # -- check src and dest paths ---------------------------------------------
+
+    raise "#{src}: missing or not a file" unless File.exist?(src) && File.file?(src)
+    raise "#{dest}: must be a directory"  if File.exist?(dest) && !File.directory?(dest)
+    
+    src = File.expand_path (src)
+    dest = File.expand_path (dest)
+    FileUtils.rm_rf(dest) if clean
+    FileUtils.mkdir_p(dest)
+
+    # -- process once (so that we are up to date)
+
+    dest = File.join dest, File.basename(src)
+    OMD.process(src, dest)
+    system "open", "-a", "Marked 2", dest if display
+
+    # -- watch directories, and rebuild on changes ----------------------------
+
+    require "rb-fsevent"
+    fsevent = FSEvent.new
+    fsevent.watch [__dir__, File.dirname(src)], latency: 0.1 do |dirs, event_meta|
+      next unless detected_change?(dirs, event_meta, src_dir: File.dirname(src))
+      OMD.process(src, dest)
+    end
+    fsevent.run
+  end
+
+  private
+
+  def detected_change?(dirs, _event_meta, src_dir:)
+    logger.debug "Detected change in", dirs.join(",")
+
+    if dirs.any? { |dir| dir.start_with?(__dir__) }
+      logger.info "reloading", __FILE__
+      load __FILE__
+      return true
+    end
+
+    if dirs.any? { |dir| dir.start_with?(src_dir) }
+      return true 
+    end
+  end
+end
+
+module OMD
+  extend self
+
+  def logger
+    OMD::CLI.logger
+  end
+
+  # Process one or more input files, put results into dest
+  def process(src, dest)
+    logger.info "Processing #{src}"
+
+    processing_time = nil
+
+    File.open(dest, "w") do |out|
+      processing_time = Benchmark.realtime do
+        input = File.open src
+
+        # read file line by line. Extract and yield omd blocks
+        while line = input.gets
+          unless line.start_with?("```")
+            out.puts line
+            next
+          end
+
+          intro = line[3 .. -1]
+          # read until end of omd block
+          code_block = []
+          while line = input.gets
+            break if line.start_with?("```")
+
+            code_block << line
+          end
+
+          code_block = code_block.join("")
+          code_block = unintend(code_block)
+          
+          process_omd(intro, code_block, out: out)
+        end
+      end
+
+      out.puts "\n> generated via OMD from #{src} in #{"%.3f secs" % processing_time}"
+    end
+
+    logger.info "generated #{dest} from #{src}: #{"%.3f secs" % processing_time}"
+  end
+
+  def unintend(code_block)
+    code_block = code_block
+      .split("\n")
+
+    number_of_leading_spaces = code_block
+      .map { |line| /^( +)/.match(line) }
+      .compact
+      .map { |matches| matches[1].length }
+      .min
+
+    code_block
+      .map { |l| /^( +)/.match(l) ? l[number_of_leading_spaces..-1] : l }
+      .map { |l| "#{l}\n" }.join
+  end
+
+  def print_code_block(code_block, lang: nil, out:)
+    out.puts <<~MD
+      ```#{lang}
+      #{code_block.chomp}
+      ```
+    MD
+  end
+
+  def process_omd(_intro, code_block, out:)
+    r = []
+
+    print_code_block code_block, lang: "c", out: out
+
+    puts code_block
+    Dir.mktmpdir do |tmpdir|
+      Dir.chdir tmpdir do
+        File.open("omd.cc", "w") do |io|
+          io.write(code_block)
+        end
+
+        success, error = sh "cc -Wall omd.cc"
+        if error
+          print_code_block error, lang: "error", out: out
+          next
+        end
+
+        success, error = sh "./a.out 10"
+        if error
+          print_code_block error, lang: "error", out: out
+          next
+        end
+
+        print_code_block success, lang: "output", out: out
+      end
+    end
+  end
+
+  def sh(cmd)
+    logger.debug "Running #{cmd}"
+    stdout_str, stderr_str, status = Open3.capture3(cmd)
+    if status.exitstatus == 0
+      [stdout_str, nil]
+    else
+      logger.warn "Running #{cmd} failed with exitstatus #{status.exitstatus}"
+      [nil, stderr_str]
+    end
+  end
+end
+
+unless $loaded
+  $loaded = true
+  OMD::CLI.run!(*ARGV)
+end

@@ -1,0 +1,142 @@
+AllCops:
+  TargetRubyVersion: 2.5
+  Exclude:
+    - bin/*
+    - doc/**/*
+    - scripts/*
+    - vendor/**/*
+    - examples/*
+    - lib/postjob/migrations.rb
+    - ./*.gemspec
+
+Metrics/BlockLength:
+  Exclude:
+    - spec/**/*
+
+Metrics/MethodLength:
+  Max: 20
+  Exclude:
+    - lib/postjob/cli/**/*.rb
+
+Metrics/ModuleLength:
+  Exclude:
+    - lib/postjob/cli/**/*.rb
+
+Metrics/ParameterLists:
+  Exclude:
+    - lib/postjob/cli/**/*.rb
+
+Style/MethodMissingSuper:
+  Exclude:
+    - spec/**/*.rb
+
+Style/Documentation:
+  Enabled: false
+
+Style/FrozenStringLiteralComment:
+  Enabled: false
+
+Style/ModuleFunction:
+  Enabled: false
+
+Style/ClassAndModuleChildren:
+  Enabled: false
+
+Style/SymbolArray:
+  Enabled: false
+
+Style/WordArray:
+  Enabled: false
+
+Style/PercentLiteralDelimiters:
+  Enabled: false
+
+Style/SpecialGlobalVars:
+  Enabled: false
+
+Style/IfUnlessModifier:
+  Enabled: false
+
+Style/RedundantSelf:
+  Enabled: false
+
+Style/NumericPredicate:
+  Enabled: false
+
+Style/FormatString:
+  Enabled: false
+
+Style/GuardClause:
+  Enabled: false
+
+Naming/AccessorMethodName:
+  Enabled: false
+
+Metrics/LineLength:
+  Max: 140
+
+Metrics/AbcSize:
+  Max: 30
+
+Metrics/CyclomaticComplexity:
+  Max: 10
+
+# bad choice: overly constricted choice; also single_quotes vs double_quotes is highly
+# questionable.
+Style/StringLiterals:
+  EnforcedStyle: double_quotes
+
+# bad choice: per-file disabled directive are easier to find and fix
+Lint/MissingCopEnableDirective:
+  Enabled: false
+
+# bad choice: because why?
+Layout/SpaceInsideArrayLiteralBrackets:
+  Enabled: false
+
+# bad choice: while loop spanning lines is easier to read
+Style/WhileUntilModifier:
+  Enabled: false
+
+# bad choice: pre 2.3 syntax is more explicit
+Style/SafeNavigation:
+  Enabled: false
+
+# MutableConstant should deep freeze constants, but doesn't. Also, strings need
+# no longer be frozen in Ruby > 2.3 anyways.
+Style/MutableConstant:
+  Enabled: false
+
+Gemspec/OrderedDependencies:
+  Enabled: false
+
+Style/RedundantReturn:
+  Enabled: false
+
+Style/StringLiteralsInInterpolation:
+  Enabled: false
+
+Style/NumericLiteralPrefix:
+  Enabled: false
+
+Style/RedundantBegin:
+  Enabled: false
+
+Style/MultipleComparison:
+  Enabled: false
+
+# this breaks old code
+Performance/RegexpMatch:
+  Enabled: false
+
+Layout/MultilineMethodCallIndentation:
+  Enabled: false
+
+Style/DoubleNegation:
+  Enabled: false
+
+Naming/UncommunicativeMethodParamName:
+  Enabled: false
+
+Style/ParallelAssignment:
+  Enabled: false
