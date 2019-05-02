@@ -15,6 +15,8 @@ require "fileutils"
 require "benchmark"
 require "tmpdir"
 require "open3"
+require "digest"
+require "pstore"
 
 module OMD
 end
@@ -69,6 +71,8 @@ module OMD::CLI
   end
 end
 
+# -- helpers ------------------------------------------------------------------
+
 def File.write(path, body)
   File.open(path, "w") do |io|
     io.write(body)
@@ -82,6 +86,21 @@ module OMD
     OMD::CLI.logger
   end
 
+  class Cache
+    def initialize(path)
+      @store = PStore.new(path)
+      @store.ultra_safe = true
+    end
+
+    def cached(*keys)
+      key = Digest::MD5.hexdigest(keys.join(","))
+
+      @store.transaction do
+        @store[key] ||= yield
+      end
+    end
+  end
+
   class Writer
     def self.open(path)
       writer = new path
@@ -93,33 +112,72 @@ module OMD
     def initialize(path)
       @dir = File.dirname(path)
       @fd = File.open path, "w"
+      @changes = []
+      @cache = Cache.new File.join(@dir, "omd.pstore")
     end
 
     def close
+      apply_changes
+
       @fd.close
       @fd = nil
     end
 
-    def line(line)
-      @fd.puts line
+    def transaction(*args)
+      apply_changes
+
+      changes = @cache.cached(*args) do
+        yield
+        @changes
+      end
+      @changes = changes
+      apply_changes
+    end
+    
+    def copy_file(path)
+      digest = Digest::MD5.hexdigest File.read(path)
+      dest_file = File.join(@dir, "#{digest}#{File.extname(path)}")
+      FileUtils.cp(path, dest_file)
+      File.basename(dest_file)
     end
 
+    def line(line)
+      @changes << [ :line, line ]
+    end
+
+    def code_block(body, lang: nil)
+      @changes << [ :code_block, body, lang ]
+    end
+    
     def error(body)
       code_block body, lang: "error"
     end
 
-    def code_block(body, lang: nil)
-      @fd.puts <<~MD
-        ```#{lang}
-        #{body.chomp}
-        ```
-      MD
+    private
+    
+    # this method is used for transaction.
+    def apply_changes
+      @changes.each do |change, *args|
+        case change
+        when :line
+          line, _ = *args
+          @fd.puts line
+        when :code_block
+          body, lang = *args
+          @fd.puts <<~MD
+            ```#{lang}
+            #{body.chomp}
+            ```
+          MD
+        end
+      end
+      @changes = []
     end
   end
 
   # Process one or more input files, put results into dest
   def process(src, dest)
-    logger.info "Processing #{src}"
+    logger.debug "processing #{src}"
 
     processing_time = nil
 
@@ -193,9 +251,8 @@ module OMD
 
       H.sh! "dot -Tpng -Gsize=16,16\! -Gdpi=72  -o dot.png omd.dot"
 
-      outpath = "/Users/eno/projects/omd/dest/outpath.png"
-      FileUtils.cp "dot.png", outpath
-      writer.line "![dot](./outpath.png)"
+      outpath = writer.copy_file "dot.png"
+      writer.line "![dot](./#{outpath})"
     end
 
     def cc(_intro, code_block, writer:)
@@ -211,18 +268,20 @@ module OMD
   end
 
   def process_omd(intro, code_block, writer:)
-    logger.warn "intro", intro
+    writer.transaction intro, code_block do
+      logger.warn "intro", intro
 
-    if Processors.respond_to?(intro)
-      Dir.mktmpdir do |tmpdir|
-        Dir.chdir tmpdir do
-          Processors.send intro, intro, code_block, writer: writer
-        rescue ShellError
-          writer.error($!.to_s)
+      if Processors.respond_to?(intro)
+        Dir.mktmpdir do |tmpdir|
+          Dir.chdir tmpdir do
+            Processors.send intro, intro, code_block, writer: writer
+          rescue ShellError
+            writer.error($!.to_s)
+          end
         end
+      else
+        writer.error "Unsupported omd processor #{intro.inspect}"
       end
-    else
-      writer.error "Unsupported omd processor #{intro.inspect}"
     end
   end
 end

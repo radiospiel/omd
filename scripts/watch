@@ -1,1 +1,1 @@
-./bin/omd watch --clean src/structure.md dest --no-display "$@"
+./bin/omd watch src/structure.md dest --display "$@"
