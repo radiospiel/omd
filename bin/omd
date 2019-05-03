@@ -117,10 +117,14 @@ module OMD
 
   class Writer
     def self.open(path)
-      writer = new path
+      tmp_name = "#{path}.{$$}"
+      writer = new tmp_name
       yield writer
+      File.rename(tmp_name, path)
     ensure
-      writer.close if writer
+      if writer
+        writer.close
+      end
     end
 
     def initialize(path)
@@ -148,12 +152,8 @@ module OMD
       apply_changes
     end
 
-    def copy_file(path)
-      digest = Digest::MD5.hexdigest File.read(path)
-      dest_file = File.join(@dir, "#{digest}#{File.extname(path)}")
-      FileUtils.cp(path, dest_file)
-      File.basename(dest_file)
-    end
+    # -- basic ops ------------------------------------------------------------
+    # basic ops are caught in the transaction.
 
     def line(line)
       @changes << [:line, line]
@@ -163,13 +163,42 @@ module OMD
       @changes << [:code_block, body, lang]
     end
 
-    def image(tmp_file, alt: nil)
-      dest_path = copy_file "dot.png"
-      writer.line "![#{alt}](./#{dest_path})"
+    # -- secondary ops --------------------------------------------------------
+    # secondary ops are built off basic ops
+
+    def copy_file(path)
+      digest = Digest::MD5.hexdigest File.read(path)
+      dest_file = File.join(@dir, "#{digest}#{File.extname(path)}")
+      FileUtils.cp(path, dest_file)
+      File.basename(dest_file)
+    end
+
+    def image(src, alt: nil)
+      dest_path = copy_file(src)
+      line "![#{alt}](./#{dest_path})"
     end
 
     def error(body)
       code_block body, lang: "error"
+    end
+
+    def table(csv, separator:)
+      csv = "|" + csv.gsub("\n", "|\n|") + "|"
+      csv = csv.gsub(separator, " | ")
+
+      # | Tables   |      Are      |  Cool |
+      # |----------|:-------------:|------:|
+      #
+      # | col 1 is |  left-aligned | $1600 |
+      # | col 2 is |    centered   |   $12 |
+      # | col 3 is | right-aligned |    $1 |
+
+      header, rest = csv.split("\n", 2)
+      line(header)
+      sep = header.gsub(/./) { |ch| ch == "|" ? "|" : "-" }
+      line(sep)
+
+      line(rest)
     end
 
     private
@@ -200,7 +229,7 @@ module OMD
 
     processing_time = nil
 
-    Writer.open dest do |writer|
+    Writer.open(dest) do |writer|
       processing_time = Benchmark.realtime do
         input = File.open src
 
@@ -282,31 +311,33 @@ module OMD
       success = H.sh! "./a.out 10"
       writer.code_block success
     end
+
+    def sql(_intro, code_block, writer:)
+      File.write("omd.sql", code_block)
+
+      success = H.sh! "psql -F'\t' --no-align -f omd.sql"
+      writer.table(success, separator: "\t")
+    end
   end
 
   def print_code_block(intro, code_block, writer:)
     return if intro =~ /^@/
     return if intro =~ /^comment/
 
-    lang = $1 if intro =~ /^@(\S+)/
+    lang = $1 if intro =~ /^@?(\S+)/
 
     code_block = code_block.gsub(/^@[^\n]*\n/, "")
-      .gsub(/^\n/, "")
+                            .gsub(/^\n/, "")
     writer.code_block(code_block, lang: lang)
   end
 
   def process_code_block(intro, code_block, writer:)
     lang = $1 if intro =~ /^@?(\S+)/
-    unless lang
-      writer.error "Unsupported omd processor #{intro.inspect}"
+    if !lang || !Processors.respond_to?(lang)
+      writer.error "omd: Unsupported omd processor #{intro.inspect}"
       return
     end
 
-    if !Processors.respond_to?(lang)
-      writer.error "Unsupported omd processor #{intro.inspect}"
-      return
-    end
-    
     writer.transaction lang, code_block do
       logger.warn "intro", intro
 

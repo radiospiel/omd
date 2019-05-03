@@ -27,6 +27,12 @@ The following is a simple command:
 
 This code is pretty straight forward - but what does it communicate?
 
+
+```{sql}
+SELECT *
+FROM generate_series(1, 3) as a(n), generate_series(1, 3)
+```
+
 ```{@dot}
 digraph finite_state_machine {
 	rankdir=LR;
