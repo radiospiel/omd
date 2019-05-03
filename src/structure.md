@@ -10,9 +10,10 @@ This is where I start
 
 The following is a simple command:
 
+
 ```{cc}
-    #include <stdio.h>
-    #include <stdlib.h>
+    @ #include <stdio.h>
+    @ #include <stdlib.h>
     
     int fib(int n) {
       return n < 3 ? 1 : fib(n-1) + fib(n-2);
@@ -20,18 +21,18 @@ The following is a simple command:
 
     int main(int argc, char** argv) {
       int n = atoi(argv[1]);
-      printf("fibonacci of %d is %d\n", n, fib(n));
+      printf("Fibonacci number of %d is %d\n", n, fib(n));
     }
 ```
 
 This code is pretty straight forward - but what does it communicate?
 
-```{dot}
+```{@dot}
 digraph finite_state_machine {
 	rankdir=LR;
 	node [shape = doublecircle]; LR_0 LR_3 LR_4 LR_8;
 	node [shape = square];
-	LR_0 -> LR_2 [ label = "SS(B)" ];
+	LR_0 -> LR_2 [ label = "foobar" ];
 	LR_0 -> LR_1 [ label = "SS(S)" ];
 	LR_1 -> LR_3 [ label = "S($end)" ];
 	LR_2 -> LR_6 [ label = "SS(b)" ];
