@@ -117,7 +117,7 @@ module OMD
 
   class Writer
     def self.open(path)
-      tmp_name = "#{path}.{$$}"
+      tmp_name = "#{path}.#{$$}"
       writer = new tmp_name
       yield writer
       File.rename(tmp_name, path)
