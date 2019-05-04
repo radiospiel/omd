@@ -1,1 +1,1 @@
-./bin/omd watch --clean src/examples/README.omd README.md --display "$@"
+./bin/omd watch --clean examples/src/README.omd README.md --display "$@"

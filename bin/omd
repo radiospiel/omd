@@ -40,7 +40,7 @@ module OMD::CLI
     
   # Process src file, and rebuild into dest directory
   def process(src, dest, clean: false, display: false)
-    src, dest = check_paths src, dest, clean: false
+    src, dest = check_paths src, dest, clean: clean
 
     OMD.process(src, dest)
     system "open", "-a", "Marked 2", dest if display
@@ -48,8 +48,10 @@ module OMD::CLI
   
   # Watch src directory, and rebuild into dest directory
   def watch(src, dest, clean: false, display: false)
+    src, dest = check_paths src, dest, clean: clean
+
     # process once (so that we are up to date)
-    process src, dest, clean: clean, display: display
+    process src, dest, clean: false, display: display
 
     # start watching
     require "rb-fsevent"
@@ -131,7 +133,10 @@ module OMD
   end
   
   def prepare_destination(dest, clean:)
-    FileUtils.rm_rf(dest_data_dir(dest)) if clean
+    if clean
+      logger.warn "rm_rf",dest_data_dir(dest)
+      FileUtils.rm_rf(dest_data_dir(dest))
+    end
     FileUtils.mkdir_p(dest_data_dir(dest))
   end
 
@@ -203,6 +208,8 @@ module OMD
       dest_file = File.join(@dir, "#{digest}#{File.extname(path)}")
       FileUtils.mkdir_p @dir
       FileUtils.cp(path, dest_file)
+      OMD.logger.warn "copy_file #{path} -> #{dest_file}"
+
       File.join(File.basename(@dir), File.basename(dest_file))
     end
 

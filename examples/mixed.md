@@ -1,4 +1,6 @@
 
+<!--TOC-->
+
 # Outline
 
 This is where I start

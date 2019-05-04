@@ -5,7 +5,7 @@ examples/mixed.md: examples/src/mixed.omd
 
 README.md: examples/src/README.omd
 	git rm -rf README.md.data/ || true
-	bin/omd process src/README.omd README.md --clean
+	bin/omd process examples/src/README.omd README.md --clean
 	git add README.md README.md.data
 
 watch:
