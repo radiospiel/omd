@@ -127,8 +127,6 @@ module OMD::CLI
       return true
     end
 
-    logger.info "#{dirs.inspect} #{src_dir.inspect}"
-
     src_dir = File.expand_path(src_dir)
     if dirs.any? { |dir| dir.start_with?(src_dir) }
       return true
@@ -477,15 +475,13 @@ module OMD
   def process_code_block(intro, code_block, writer:)
     lang = $1 if intro =~ /^@?(\S+)/
 
-    logger.warn "lang", lang
-
     if !lang || !Processors.respond_to?(lang)
       writer.error "omd: Unsupported omd processor #{intro.inspect}"
       return
     end
 
     writer.transaction lang, code_block do
-      logger.warn "intro", intro
+      logger.warn "processing an #{intro.inspect} block"
 
       Dir.mktmpdir do |tmpdir|
         Dir.chdir tmpdir do
