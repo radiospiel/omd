@@ -234,6 +234,22 @@ The SQL code is executed as a SQL command via the `psql` command. A default inst
   createdb $(whoami)
 ```
 
+
+## Controlling the display mode
+
+The above examples use some default display mode to print the result. `omd` also allows you to override this. The following example runs git diff on a file in this repository, formatting the output in diff mode:
+
+    ```{@bash | diff}
+    git diff cb6e2b0a~ cb6e2b0a
+    ```
+
+The result looks like this:
+
+```{@bash | diff}
+git diff --unified=2 cb6e2b0a~ cb6e2b0a -- bin/omd
+```
+
+
 <!--BREAK-->
 
 ## Hint

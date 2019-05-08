@@ -76,13 +76,13 @@ The characters between `{` and `}` in the opening fence describe ***omd* process
 
 When `omd` detects a code block it copies the code block into the output, followed by the code's output. It is possible to suppress either the entire source code block, leaving only the result in the output, by prepending the codeblock marker with a `@` character:
 
-		```{@cc}
-		#include <stdio.h>
-		
-		int main() {
-		  printf("You should not see my source!\n"); return 0;
-		}
-		```
+    ```{@cc}
+    #include <stdio.h>
+    
+    int main() {
+      printf("You should not see my source!\n"); return 0;
+    }
+    ```
 
 resulting in
 
@@ -92,13 +92,13 @@ You should not see my source!
 
 Alternatively, to hide some, but not all of the input, prepend these lines with an `@` character:
 
-		```{cc}
-		@#include <stdio.h>
-		
-		int main() {
-		  printf("The #include line should not be seen here.\n"); return 0;
-		}
-		```
+    ```{cc}
+    @#include <stdio.h>
+    
+    int main() {
+      printf("The #include line should not be seen here.\n"); return 0;
+    }
+    ```
 
 resulting in
 
@@ -197,8 +197,8 @@ The result looks like this:
 fortune all
 ```
 ```
-	"You've got to think about tomorrow!"
-	"TOMORROW!  I haven't even prepared for *_________yesterday* yet!"
+Don't despise your poor relations, they may become suddenly rich one day.
+		-- Josh Billings
 ```
 
 ## SQL: the `{sql}` processing instruction
@@ -245,6 +245,46 @@ The SQL code is executed as a SQL command via the `psql` command. A default inst
   createuser $(whoami)
   createdb $(whoami)
 ```
+
+
+## Controlling the display mode
+
+The above examples use some default display mode to print the result. `omd` also allows you to override this. The following example runs git diff on a file in this repository, formatting the output in diff mode:
+
+    ```{@bash | diff}
+    git diff cb6e2b0a~ cb6e2b0a
+    ```
+
+The result looks like this:
+
+```diff
+diff --git a/bin/omd b/bin/omd
+index f5046a4..8f1ba96 100755
+--- a/bin/omd
++++ b/bin/omd
+@@ -128,6 +128,4 @@ module OMD::CLI
+     end
+ 
+-    logger.info "#{dirs.inspect} #{src_dir.inspect}"
+-
+     src_dir = File.expand_path(src_dir)
+     if dirs.any? { |dir| dir.start_with?(src_dir) }
+@@ -478,6 +476,4 @@ module OMD
+     lang = $1 if intro =~ /^@?(\S+)/
+ 
+-    logger.warn "lang", lang
+-
+     if !lang || !Processors.respond_to?(lang)
+       writer.error "omd: Unsupported omd processor #{intro.inspect}"
+@@ -486,5 +482,5 @@ module OMD
+ 
+     writer.transaction lang, code_block do
+-      logger.warn "intro", intro
++      logger.warn "processing an #{intro.inspect} block"
+ 
+       Dir.mktmpdir do |tmpdir|
+```
+
 
 <!--BREAK-->
 
