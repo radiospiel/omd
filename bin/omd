@@ -4,6 +4,9 @@ require "bundler/inline"
 
 # rubocop:disable Layout/MultilineMethodCallIndentation
 # rubocop:disable Style/GuardClause
+# rubocop:disable Style/WhileUntilModifier
+# rubocop:disable Style/ParallelAssignment
+
 gemfile do
   source "https://rubygems.org"
   gem "rb-fsevent", require: false
@@ -19,45 +22,95 @@ require "digest"
 require "pstore"
 
 module OMD
+  extend self
+
+  def logger
+    OMD::CLI.logger
+  end
 end
 
 module OMD::CLI
   include ::Simple::CLI
 
   private
-  
+
   def check_paths(src, dest, clean:)
+    dest ||= src.gsub(/\.[^\.]*$/, "") + ".md"
+
+    raise "#{src} and #{dest} files must differ" unless src != dest
     raise "#{src}: missing or not a file" unless File.exist?(src) && File.file?(src)
     raise "#{dest}: cannot be a directory" if File.exist?(dest) && File.directory?(dest)
 
     src = File.expand_path(src)
     dest = File.expand_path(dest)
+
+    raise "input and output file must be in the same directory" if File.dirname(src) != File.dirname(dest)
+
     OMD.prepare_destination(dest, clean: clean)
-    [ src, dest ]
+    [src, dest]
   end
-  
+
   public
-    
-  # Process src file, and rebuild into dest directory
-  def process(src, dest, clean: false, display: false)
-    src, dest = check_paths src, dest, clean: clean
+
+  # Process src file, and process into a destination file
+  #
+  # Flags:
+  #
+  #   --output=<file>     The output file, defaults to the source file with a ".md" file extension
+  #   --display           Open the "Marked 2" markdown preview
+  #   --clean             Clear put cache
+  #
+  # Example:
+  #
+  # To process the src/README.omd file and generate the src/README.md file, using the cache
+  # for results from previous runs:
+  #
+  #     omd process src/README.omd
+  #
+  # To completely process the src/README.omd file, ignoring everything in the cache, generate
+  # the src/result.md file, and open the "Marked 2" markdown viewer:
+  #
+  #     omd process src/README.omd --output=src/result.md --clean --display
+  #
+  def process(src, output: nil, clean: false, display: false)
+    src, dest = check_paths src, output, clean: clean
 
     OMD.process(src, dest)
     system "open", "-a", "Marked 2", dest if display
   end
-  
-  # Watch src directory, and rebuild into dest directory
-  def watch(src, dest, clean: false, display: false)
-    src, dest = check_paths src, dest, clean: clean
+
+  # Watches a source file, rebuilding the destination target whenever necessary
+  #
+  # Flags:
+  #
+  #   --output=<file>     The output file, defaults to the source file with a ".md" file extension
+  #   --display           Open the "Marked 2" markdown preview
+  #   --clean             Clear put cache
+  #
+  # Example:
+  #
+  # To process the src/README.omd file and generate the src/README.md file, using the cache
+  # for results from previous runs:
+  #
+  #     omd process src/README.omd
+  #
+  # To completely process the src/README.omd file, ignoring everything in the cache, generate
+  # the src/result.md file, and open the "Marked 2" markdown viewer:
+  #
+  #     omd process src/README.omd --output=src/result.md --clean --display
+  #
+  def watch(src, output: nil, clean: false, display: false)
+    src, dest = check_paths src, output, clean: clean
 
     # process once (so that we are up to date)
-    process src, dest, clean: false, display: display
+    process src, output: dest, clean: false, display: display
 
     # start watching
     require "rb-fsevent"
     fsevent = FSEvent.new
     fsevent.watch [__dir__, File.dirname(src)], latency: 0.1 do |dirs, event_meta|
       next unless detected_change?(dirs, event_meta, src_dir: File.dirname(src))
+
       OMD.process(src, dest)
     end
     fsevent.run
@@ -89,32 +142,43 @@ def File.write(path, body, permissions: nil)
   File.open(path, "w") do |io|
     io.write(body)
   end
-  
+
   File.chmod permissions, path if permissions
-  
+
   path
 end
 
 module OMD
-  extend self
+  module SourceVersion
+    extend self
 
-  def logger
-    OMD::CLI.logger
-  end
-
-  class Cache
-    def self.reset!
+    def reset!
+      OMD.logger.success "reset source_version"
       @source_version = nil
-    end
-
-    def self.source_version
-      @source_version ||= Digest::MD5.hexdigest(File.read(__FILE__))
     end
 
     reset!
 
+    def reloaded?
+      reloaded = @previous_source_version != OMD::SourceVersion.source_version
+      @previous_source_version = OMD::SourceVersion.source_version
+      reloaded
+    end
+
+    def source_version
+      return @source_version if @source_version
+
+      @source_version = Digest::MD5.hexdigest(File.read(__FILE__))
+      OMD.logger.success "source_version", @source_version
+      @source_version
+    end
+  end
+end
+
+module OMD
+  class Cache
     def self.key(*parts)
-      Digest::MD5.hexdigest(source_version + ":" + parts.join(","))
+      Digest::MD5.hexdigest(OMD::SourceVersion.source_version + ":" + parts.join(","))
     end
 
     def initialize(dir)
@@ -132,15 +196,12 @@ module OMD
   end
 
   def dest_data_dir(dest)
-    dirname, basename = File.dirname(dest), File.basename(dest) 
+    dirname, basename = File.dirname(dest), File.basename(dest)
     File.join(dirname, "#{basename}.data")
   end
-  
+
   def prepare_destination(dest, clean:)
-    if clean
-      logger.warn "rm_rf",dest_data_dir(dest)
-      FileUtils.rm_rf(dest_data_dir(dest))
-    end
+    FileUtils.rm_rf(dest_data_dir(dest)) if clean
     FileUtils.mkdir_p(dest_data_dir(dest))
   end
 
@@ -206,8 +267,9 @@ module OMD
 
     def copy_file(path)
       unless File.exist?(path)
-        raise IncompleteTransaction, "copy_file: missing file #{path}" 
+        raise IncompleteTransaction, "copy_file: missing file #{path}"
       end
+
       digest = Digest::MD5.hexdigest File.read(path)
       dest_file = File.join(@dir, "#{digest}#{File.extname(path)}")
       FileUtils.mkdir_p @dir
@@ -270,7 +332,7 @@ module OMD
 
   # Process one or more input files, put results into dest
   def process(src, dest)
-    logger.debug "processing #{src}"
+    return if File.exist?(dest) && File.mtime(src) < File.mtime(dest) && !OMD::SourceVersion.reloaded?
 
     processing_time = nil
 
@@ -351,18 +413,28 @@ module OMD
     end
 
     def ruby(_intro, code_block, writer:)
-      gemfile = ENV['BUNDLE_GEMFILE']
-      
-      if gemfile
-        ENV['BUNDLE_GEMFILE'] = nil
-      end
-      
-      File.write("omd.rb", code_block, permissions: 0755)
+      gemfile = ENV["BUNDLE_GEMFILE"]
 
-      success = H.sh! "ruby ./omd.rb"
-      writer.code_block success
+      if gemfile
+        ENV["BUNDLE_GEMFILE"] = nil
+      end
+
+      File.write("omd.rb", code_block, permissions: 0o755)
+
+      result = H.sh! "ruby ./omd.rb"
+      writer.code_block result, lang: "ruby"
     ensure
-        ENV['BUNDLE_GEMFILE'] = nil      if gemfile
+      ENV["BUNDLE_GEMFILE"] = nil if gemfile
+    end
+
+    def bash(_intro, code_block, writer:)
+      File.write "omd.sh", <<~BASH, permissions: 0755
+      #!/bin/bash
+      #{code_block}
+      BASH
+
+      result = H.sh! "./omd.sh"
+      writer.code_block result
     end
 
     def cc(_intro, code_block, writer:)
@@ -370,8 +442,8 @@ module OMD
 
       H.sh! "cc -Wall omd.cc"
 
-      success = H.sh! "./a.out 10"
-      writer.code_block success
+      result = H.sh! "./a.out 10"
+      writer.code_block result
     end
 
     def sql(_intro, code_block, writer:)
@@ -404,6 +476,9 @@ module OMD
 
   def process_code_block(intro, code_block, writer:)
     lang = $1 if intro =~ /^@?(\S+)/
+
+    logger.warn "lang", lang
+
     if !lang || !Processors.respond_to?(lang)
       writer.error "omd: Unsupported omd processor #{intro.inspect}"
       return
