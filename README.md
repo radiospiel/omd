@@ -3,7 +3,7 @@
 
 "Oh My Doc" –– or, short, `omd`, is a preprocessor which lets an author write markdown containing code. When preprocessing the document `omd` executes this code and embeds the results into the generated markdown output. This should help you write about code, or discuss data. In general one could see `omd` as a server-less, lightweight, alternative to a Jypiter Notebook.
 
-The input to *omd* still looks like and very much is markdown. Fenced markdown blocks might contain omd processing instructions; for details check the [manual](doc/manual.md).
+The input to *omd* still looks like and very much is markdown.
 
 Currently *omd* supports the following input:
 
@@ -26,6 +26,8 @@ figlet "An OMD Example"
 /_/   \_\_| |_|  \___/|_|  |_|____/  |_____/_/\_\__,_|_| |_| |_| .__/|_|\___|
                                                                |_|           
 ```
+
+More details on omd processing instructions can be found below.
 
 ## Security warning
 
@@ -179,8 +181,9 @@ The result looks like this:
 fortune all
 ```
 ```
-We don't need no education, we don't need no thought control.
-		-- Pink Floyd
+I'm proud to be paying taxes in the United States.  The only thing is
+-- I could be just as proud for half the money.
+		-- Arthur Godfrey
 ```
 
 ## SQL: the `{sql}` processing instruction
@@ -229,28 +232,6 @@ The SQL code is executed as a SQL command via the `psql` command. A default inst
 ```
 
 <!--BREAK-->
-
-# Tips & Tricks
-
-## Hiding parts or all of the source code
-
-Lines in the source code portion starting with `@` are not included in the rendered markdown file.
-
-Note that it is also possible to completely omit the command source code by prefixing the OMD processing instruction with an `@`, which works with all embedded commands.
-
-    ```{@cc}
-        #include <stdio.h>
-        #include <stdlib.h>
-        
-        int fib(int n) {
-          return n < 3 ? 1 : fib(n-1) + fib(n-2);
-        }
-    
-        int main(int argc, char** argv) {
-          int n = atoi(argv[1]);
-          printf("Fibonacci number of %d is %d\n", n, fib(n));
-        }
-    ```
 
 ## Hint
 
