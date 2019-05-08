@@ -76,11 +76,31 @@ The characters between `{` and `}` in the opening fence describe ***omd* process
 
 When `omd` detects a code block it copies the code block into the output, followed by the code's output. It is possible to suppress either the entire source code block, leaving only the result in the output, by prepending the codeblock marker with a `@` character:
 
+		```{@cc}
+		#include <stdio.h>
+		
+		int main() {
+		  printf("You should not see my source!\n"); return 0;
+		}
+		```
+
+resulting in
+
 ```
 You should not see my source!
 ```
 
 Alternatively, to hide some, but not all of the input, prepend these lines with an `@` character:
+
+		```{cc}
+		@#include <stdio.h>
+		
+		int main() {
+		  printf("The #include line should not be seen here.\n"); return 0;
+		}
+		```
+
+resulting in
 
 ```cc
 int main() {
@@ -90,6 +110,7 @@ int main() {
 ```
 The #include line should not be seen here.
 ```
+
 
 ## Comments
 
@@ -176,8 +197,8 @@ The result looks like this:
 fortune all
 ```
 ```
-QOTD:
-	"My life is a soap opera, but who gets the movie rights?"
+	"You've got to think about tomorrow!"
+	"TOMORROW!  I haven't even prepared for *_________yesterday* yet!"
 ```
 
 ## SQL: the `{sql}` processing instruction
