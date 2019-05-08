@@ -29,6 +29,20 @@ The following is a simple command:
 
 This code is pretty straight forward - but what does it communicate?
 
+Now some ruby:
+
+```{ruby}
+require 'benchmark'
+
+data = "1" * 1000
+n = 1000
+Benchmark.bm do |x|
+  x.report("+=") { s = ""; for i in 1..n; s += data; end }
+  x.report("<<") { s = ""; for i in 1..n; s << data; end }
+end
+```
+
+and some SQL:
 
 ```{sql}
 SELECT *

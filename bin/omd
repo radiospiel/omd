@@ -85,10 +85,14 @@ end
 
 # -- helpers ------------------------------------------------------------------
 
-def File.write(path, body)
+def File.write(path, body, permissions: nil)
   File.open(path, "w") do |io|
     io.write(body)
   end
+  
+  File.chmod permissions, path if permissions
+  
+  path
 end
 
 module OMD
@@ -344,6 +348,21 @@ module OMD
       H.sh! "dot -Tpng -Gsize=16,16\! -Gdpi=72  -o dot.png omd.dot"
 
       writer.image "dot.png", alt: "dot"
+    end
+
+    def ruby(_intro, code_block, writer:)
+      gemfile = ENV['BUNDLE_GEMFILE']
+      
+      if gemfile
+        ENV['BUNDLE_GEMFILE'] = nil
+      end
+      
+      File.write("omd.rb", code_block, permissions: 0755)
+
+      success = H.sh! "ruby ./omd.rb"
+      writer.code_block success
+    ensure
+        ENV['BUNDLE_GEMFILE'] = nil      if gemfile
     end
 
     def cc(_intro, code_block, writer:)
