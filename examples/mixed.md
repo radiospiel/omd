@@ -26,6 +26,25 @@ Fibonacci number of 10 is 55
 
 This code is pretty straight forward - but what does it communicate?
 
+Now some ruby:
+
+```ruby
+require 'benchmark'
+
+data = "1" * 1000
+n = 1000
+Benchmark.bm do |x|
+  x.report("+=") { s = ""; for i in 1..n; s += data; end }
+  x.report("<<") { s = ""; for i in 1..n; s << data; end }
+end
+```
+```ruby
+       user     system      total        real
++=  0.115255   0.095453   0.210708 (  0.211546)
+<<  0.000542   0.000410   0.000952 (  0.000952)
+```
+
+and some SQL:
 
 ```sql
 SELECT *

@@ -1,9 +1,18 @@
 
+```
+  ___  _       __  __         ____             _ 
+ / _ \| |__   |  \/  |_   _  |  _ \  ___   ___| |
+| | | | '_ \  | |\/| | | | | | | | |/ _ \ / __| |
+| |_| | | | | | |  | | |_| | | |_| | (_) | (__|_|
+ \___/|_| |_| |_|  |_|\__, | |____/ \___/ \___(_)
+                      |___/                      
+```
+
 # Oh My Doc!
 
-"Oh My Doc" –– or, short, `omd`, is a preprocessor which lets an author write markdown containing code. When preprocessing the document `omd` executes this code and embeds the results into the generated markdown output. This should help you write about code, or discuss data. In general one could see `omd` as a server-less, lightweight, alternative to a Jypiter Notebook.
+"Oh My Doc" –– or, short, `omd`, is a preprocessor which lets an author write markdown containing code. When preprocessing the document `omd` executes this code and embeds the results into the generated markdown output. For example, the logo above is generated via OMD's shell integration and the figlet command. Still, *omd's* input still looks like and very much is markdown.
 
-The input to *omd* still looks like and very much is markdown.
+The capability to embed code and its output should help you write about and discuss code or data. One could see `omd` as a server-less, lightweight, alternative to a Jypiter Notebook. 
 
 Currently *omd* supports the following input:
 
@@ -12,20 +21,6 @@ Currently *omd* supports the following input:
 - Ruby programs: they are executed; their output is embedded verbatim in the output;
 - Graphviz dot scripts: they are rendered into images that then are embedded into the output;
 - SQL commands: they are executed via a psql session; the output is rendered into a table.
-
-**Example:** The logo example below is generated via OMD's shell integration:
-
-```bash
-figlet "An OMD Example"
-```
-```
-    _             ___  __  __ ____    _____                           _      
-   / \   _ __    / _ \|  \/  |  _ \  | ____|_  ____ _ _ __ ___  _ __ | | ___ 
-  / _ \ | '_ \  | | | | |\/| | | | | |  _| \ \/ / _` | '_ ` _ \| '_ \| |/ _ \
- / ___ \| | | | | |_| | |  | | |_| | | |___ >  < (_| | | | | | | |_) | |  __/
-/_/   \_\_| |_|  \___/|_|  |_|____/  |_____/_/\_\__,_|_| |_| |_| .__/|_|\___|
-                                                               |_|           
-```
 
 More details on omd processing instructions can be found below.
 
@@ -181,9 +176,8 @@ The result looks like this:
 fortune all
 ```
 ```
-I'm proud to be paying taxes in the United States.  The only thing is
--- I could be just as proud for half the money.
-		-- Arthur Godfrey
+QOTD:
+	"My life is a soap opera, but who gets the movie rights?"
 ```
 
 ## SQL: the `{sql}` processing instruction

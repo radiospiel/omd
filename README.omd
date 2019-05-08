@@ -3,11 +3,15 @@ This document is intended for processing via the OMD markdown preprocessor
 https://github.com/radiospiel/omd
 ```
 
+```{@bash}
+figlet "Oh My Doc!"
+```
+
 # Oh My Doc!
 
-"Oh My Doc" –– or, short, `omd`, is a preprocessor which lets an author write markdown containing code. When preprocessing the document `omd` executes this code and embeds the results into the generated markdown output. This should help you write about code, or discuss data. In general one could see `omd` as a server-less, lightweight, alternative to a Jypiter Notebook.
+"Oh My Doc" –– or, short, `omd`, is a preprocessor which lets an author write markdown containing code. When preprocessing the document `omd` executes this code and embeds the results into the generated markdown output. For example, the logo above is generated via OMD's shell integration and the figlet command. Still, *omd's* input still looks like and very much is markdown.
 
-The input to *omd* still looks like and very much is markdown.
+The capability to embed code and its output should help you write about and discuss code or data. One could see `omd` as a server-less, lightweight, alternative to a Jypiter Notebook. 
 
 Currently *omd* supports the following input:
 
@@ -16,12 +20,6 @@ Currently *omd* supports the following input:
 - Ruby programs: they are executed; their output is embedded verbatim in the output;
 - Graphviz dot scripts: they are rendered into images that then are embedded into the output;
 - SQL commands: they are executed via a psql session; the output is rendered into a table.
-
-**Example:** The logo example below is generated via OMD's shell integration:
-
-```{bash}
-figlet "An OMD Example"
-```
 
 More details on omd processing instructions can be found below.
 
