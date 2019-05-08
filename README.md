@@ -1,19 +1,31 @@
 
 # Oh My Doc!
 
-"Oh My Doc" –– or, short, `omd`, helps you write about code. It lets you embed both code blocks and their results into a Markdown document. This, I hope, should help people writing about and discussing code.
+"Oh My Doc" –– or, short, `omd`, is a preprocessor which lets an author write markdown containing code. When preprocessing the document `omd` executes this code and embeds the results into the generated markdown output. This should help you write about code, or discuss data. In general one could see `omd` as a server-less, lightweight, alternative to a Jypiter Notebook.
 
-The input to *omd* still looks like and very much is markdown. In contrast to general markdown processing *omd* lets you embed both input data usually not processable by markdown.
-
-*omd* acts as a preprocessor, converting enriched markdown into plain markdown, while taking care to process such input into a format that is generally compatibe with Markdown renderers, and embeds the generated output into the created target file.
+The input to *omd* still looks like and very much is markdown. Fenced markdown blocks might contain omd processing instructions; for details check the [manual](doc/manual.md).
 
 Currently *omd* supports the following input:
 
+- Shell commands
 - C language programs: they are compiled and executed; their output is embedded verbatim in the output;
+- Ruby programs: they are executed; their output is embedded verbatim in the output;
 - Graphviz dot scripts: they are rendered into images that then are embedded into the output;
 - SQL commands: they are executed via a psql session; the output is rendered into a table.
 
-With all of the above the input data can either be included in the rendered Markdown, or hidden.
+**Example:** The logo example below is generated via OMD's shell integration:
+
+```bash
+figlet "An OMD Example"
+```
+```
+    _             ___  __  __ ____    _____                           _      
+   / \   _ __    / _ \|  \/  |  _ \  | ____|_  ____ _ _ __ ___  _ __ | | ___ 
+  / _ \ | '_ \  | | | | |\/| | | | | |  _| \ \/ / _` | '_ ` _ \| '_ \| |/ _ \
+ / ___ \| | | | | |_| | |  | | |_| | | |___ >  < (_| | | | | | | |_) | |  __/
+/_/   \_\_| |_|  \___/|_|  |_|____/  |_____/_/\_\__,_|_| |_| |_| .__/|_|\___|
+                                                               |_|           
+```
 
 ## Security warning
 
@@ -31,17 +43,15 @@ You have been warned.
 
 <!--BREAK-->
 
-# General use
-
 ## Command line usage
 
 To process an input file run
 
-    omd process [ --clean ] [ --display ] <src> <dest>
+    omd process [ --clean ] [ --display ] <src> [ --output=<dest> ]
 
 To continuously watch the input file for changes and rebuild when necessary run
 
-    omd watch [ --clean ] [ --display ] <src> <dest>
+    omd watch [ --clean ] [ --display ] <src> [ --output=<dest> ]
 
 Command line flags are:
 
@@ -62,9 +72,27 @@ In general, *omd* only deals with code blocks like the following, leaving everyt
     }
     ```
 
-The characters between `{` and `}` in the opening fence describe ** *omd* processing instructions**. They define the expected syntax in the code block. If supported by *omd* the embedded program is build and run, and it's output is captured and embedded into the resulting markdown file.
 
-The following paragraphs describe various processing instructions.
+The characters between `{` and `}` in the opening fence describe ***omd* processing instructions**. They define the expected syntax in the code block. If a code block's processing instruction is supported by *omd* the embedded program is build and run, and its output is captured and embedded into the resulting markdown file.
+
+## Controlling the display of the code block
+
+When `omd` detects a code block it copies the code block into the output, followed by the code's output. It is possible to suppress either the entire source code block, leaving only the result in the output, by prepending the codeblock marker with a `@` character:
+
+```
+You should not see my source!
+```
+
+Alternatively, to hide some, but not all of the input, prepend these lines with an `@` character:
+
+```cc
+int main() {
+  printf("The #include line should not be seen here.\n"); return 0;
+}
+```
+```
+The #include line should not be seen here.
+```
 
 ## Comments
 
@@ -75,13 +103,7 @@ A comment block is not rendered in the output.
     https://github.com/radiospiel/omd
     ```
 
-## Processing a OMD document
-
-OMD documents generally contain program code, which is executed in order to generate a Markdown file, which can then be viewed passively.
-
-Since the embedded scripts are intentionally not crippled, it is very easy to set up a document that could, for example, delete your hard disk. **You should therefore never open a OMD file that you didn't write yourself or inspected properly.**
-
-## C
+## C: the `{cc}` processing instruction
 
 The following block is compiling a C program and rendering both the source code and the output of the command. Lines starting with `@` are omitted from the output:
 
@@ -115,7 +137,7 @@ int main(int argc, char** argv) {
 Fibonacci number of 10 is 55
 ```
 
-## Graphviz
+## Graphviz: the `{dot}` processing instruction
 
 The following block is being run through Graphviz`s `dot` command to generate a graph. The graph is then embedded as an image:
 
@@ -142,7 +164,26 @@ digraph finite_state_machine {
 ```
 ![dot](./README.md.data/e5fe6234a5d360433079914af1e5d016.png)
 
-## SQL
+
+## Shell code: the `{bash}` processing instruction
+
+The following block is running a shell script:
+
+    ```{bash}
+		fortune all
+    ```
+
+The result looks like this:
+
+```bash
+fortune all
+```
+```
+We don't need no education, we don't need no thought control.
+		-- Pink Floyd
+```
+
+## SQL: the `{sql}` processing instruction
 
 The following block is being executed as a SQL command:
 
