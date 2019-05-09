@@ -278,6 +278,8 @@ module OMD
     end
 
     def image(src, alt: nil)
+      OMD.logger.warn "image #{src.inspect}"
+      
       dest_path = copy_file(src)
       line "![#{alt}](./#{dest_path})"
     end
@@ -391,12 +393,22 @@ module OMD
   module H
     extend self
 
-    def sh!(cmd)
-      OMD.logger.debug "Running #{cmd}"
-      stdout_str, stderr_str, status = Open3.capture3(cmd)
-      return stdout_str if status.exitstatus == 0
+    def sh(cmd)
+      sh! cmd, raise_on_error: false
+    end
 
-      raise ShellError, stderr_str
+    def sh!(cmd, raise_on_error: true)
+      OMD.logger.warn "Running #{cmd}"
+      stdout_str, stderr_str, status = Open3.capture3(cmd)
+
+      # "Running #{cmd}"
+      return stdout_str if status.exitstatus == 0
+      return stdout_str if !raise_on_error
+
+      OMD.logger.warn "Running #{cmd} -> #{status.exitstatus}"
+      OMD.logger.info stderr_str
+
+      raise ShellError, stderr_str if raise_on_error
     end
   end
 
@@ -428,6 +440,21 @@ module OMD
       ENV["BUNDLE_GEMFILE"] = nil if gemfile
     end
 
+    def bob(filters, code_block, writer:)
+      File.write("omd.bob", code_block)
+      result = H.sh! "svgbob omd.bob -o bob.svg"
+      writer.image "bob.svg", alt: "svgbob"
+    end
+
+    def mermaid(filters, code_block, writer:)
+      OMD.logger.warn "mermaid"
+      File.write("omd.mmd", code_block)
+      OMD.logger.warn "wrote file mermaid"
+      result = H.sh! "mmdc -i omd.mmd -o mermaid.png"
+      OMD.logger.warn "got result"
+      writer.image "mermaid.png", alt: "mermaid"
+    end
+
     def bash(filters, code_block, writer:)
       tmp_file = ".omd-#{$$}.sh"
       File.write tmp_file, <<~BASH, permissions: 0755
@@ -444,7 +471,7 @@ module OMD
       end
     ensure
       FileUtils.rm_f tmp_file
-    end
+    end    
 
     def cc(filters, code_block, writer:)
       File.write("omd.cc", code_block)

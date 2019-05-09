@@ -20,7 +20,8 @@ Currently *omd* supports the following input:
 - C language programs: they are compiled and executed; their output is embedded verbatim in the output;
 - Ruby programs: they are executed; their output is embedded verbatim in the output;
 - Graphviz dot scripts: they are rendered into images that then are embedded into the output;
-- SQL commands: they are executed via a psql session; the output is rendered into a table.
+- SQL commands: they are executed via a psql session; the output is rendered into a table;
+- svgbob diagrams: they are executed via svgbob and embedded as a SVG image.
 
 More details on omd processing instructions can be found below.
 
@@ -155,6 +156,26 @@ int main(int argc, char** argv) {
 Fibonacci number of 10 is 55
 ```
 
+## svgbob: the `{bob}` processing instruction
+
+The following block is being run through svgbob. The graph is then embedded as an SVG image:
+
+    ```{bob}
+    o->  Sequence Diagrams
+    
+                                       .--->  F
+              A       B      C  D     /
+              *-------*-----*---*----*----->  E
+                       \            ^ \
+                        v          /   '--->  G
+                         B --> C -'
+    ```
+
+The result looks like this:
+
+![svgbob](./README.md.data/97c66671cf6827b6f4b8d235b7b96b35.svg)
+
+
 ## Graphviz: the `{dot}` processing instruction
 
 The following block is being run through Graphviz`s `dot` command to generate a graph. The graph is then embedded as an image:
@@ -182,6 +203,23 @@ digraph finite_state_machine {
 ```
 ![dot](./README.md.data/e5fe6234a5d360433079914af1e5d016.png)
 
+## mermaid: the `{mermaid}` processing instruction
+
+The following block is being run through mermaidjs' command line to generate an image.
+
+    ```{mermaid}
+    gantt
+        title A Gantt Diagram
+        dateFormat  YYYY-MM-DD
+        section Section
+        A task           :a1, 2014-01-01, 30d
+        Another task     :after a1  , 20d
+        section Another
+        Task in sec      :2014-01-12  , 12d
+        another task      : 24d
+    ```
+
+![mermaid](./README.md.data/f58c0a392ee724959ae56b10f1b8b969.png)
 
 ## Shell code: the `{bash}` processing instruction
 
@@ -197,8 +235,12 @@ The result looks like this:
 fortune all
 ```
 ```
-Don't despise your poor relations, they may become suddenly rich one day.
-		-- Josh Billings
+Have you ever felt like a wounded cow
+halfway between an oven and a pasture?
+walking in a trance toward a pregnant
+	seventeen-year-old housewife's
+	two-day-old cookbook?
+		-- Richard Brautigan
 ```
 
 ## SQL: the `{sql}` processing instruction
