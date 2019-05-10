@@ -16,3 +16,10 @@ watch:
 
 format:
 	rubocop -a bin/omd
+
+install: dependencies
+	cp bin/omd /usr/local/bin
+
+dependencies:
+	which svgbob || cargo install svgbob_cli
+	which mmdc || npm install -g mermaid.cli

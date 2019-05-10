@@ -219,7 +219,7 @@ The following block is being run through mermaidjs' command line to generate an 
         another task      : 24d
     ```
 
-![mermaid](./README.md.data/f58c0a392ee724959ae56b10f1b8b969.png)
+![mermaid](./README.md.data/35f485d7f8315c1ab271dc43fa5cffe4.png)
 
 ## Shell code: the `{bash}` processing instruction
 
@@ -235,12 +235,10 @@ The result looks like this:
 fortune all
 ```
 ```
-Have you ever felt like a wounded cow
-halfway between an oven and a pasture?
-walking in a trance toward a pregnant
-	seventeen-year-old housewife's
-	two-day-old cookbook?
-		-- Richard Brautigan
+petribar:
+	Any sun-bleached prehistoric candy that has been sitting in
+	the window of a vending machine too long.
+		-- Rich Hall, "Sniglets"
 ```
 
 ## SQL: the `{sql}` processing instruction
