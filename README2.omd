@@ -1,0 +1,526 @@
+The following describes a mermaid sequenceDiagram
+
+```{mermaid}
+sequenceDiagram
+    participant Alice
+    participant Bob
+    Alice->>John: Hello John, how are you?
+    loop Healthcheck
+        John->>John: Fight against hypochondria
+    end
+    Note right of John: Rational thoughts <br/>prevail!
+    John-->>Alice: Great!
+    John->>Bob: How about you?
+    Bob-->>John: Jolly good!
+```
+
+```{mermaid}
+sequenceDiagram
+  customer->>ticket seller: ask ticket
+  ticket seller->>database: seats
+  alt tickets available
+    database->>ticket seller: ok
+    ticket seller->>customer: confirm
+    customer->>ticket seller: ok
+    ticket seller->>database: book a seat
+    ticket seller->>printer: print ticket
+  else sold out
+    database->>ticket seller: none left
+    ticket seller->>customer: sorry
+  end
+```
+      
+# This block defines the svgbob rendering instruction
+
+## configuring a processing step
+
+The following block configures the xecho command:
+
+```{configure xecho source_type:null}
+set -eu -o pipefail
+cat | sed 's/^/[x] /'
+--- omd:check
+which echo
+```
+
+which can be used as
+
+    ```{xecho}
+    Each line here
+    will be preceded
+    by a [x] 
+    ```
+
+and results in
+
+```{xecho}
+Each line here
+will be preceded
+by a [x] 
+```
+
+Note how the above line prints the input of the block, and the result of the processing step. If you only want to include the result prepend the block's command with '@':
+
+    ```{@xecho}
+    Each line here
+    will be preceded
+    by a [x] 
+    ```
+
+and results in
+
+```{@xecho}
+Each line here
+will be preceded
+by a [x] 
+```
+
+## pre-configured modes
+
+- The 'cc' mode
+- The 'plantuml' mode
+- The 'fortune' mode
+
+Examples:
+
+```{!cc}
+@#include <stdio.h>
+
+int main()
+{
+  printf("Hello, world!\n");
+  return 0;
+}
+```
+
+```{!@fortune}
+```
+
+```{plantuml}
+@startuml
+scale 1600 width
+Alice -> Bob: test
+Bob -> Alice: thank you!
+@enduml
+```
+
+```{plantuml}
+@startuml
+scale 1600 width
+
+partition Conductor {
+  (*) --> "Climbs on Platform"
+  --> === S1 ===
+  --> Bows
+}
+
+partition Audience #LightSkyBlue {
+  === S1 === --> Applauds
+}
+
+partition Conductor {
+  Bows --> === S2 ===
+  --> WavesArmes
+  Applauds --> === S2 ===
+}
+
+partition Orchestra #CCCCEE {
+  WavesArmes --> Introduction
+  --> "Play music"
+}
+
+@enduml
+```
+
+__END__
+
+```{configure svgbobx}
+# Note: svgbob processes STDIN into STDOUT
+svgbob
+--- omd:check
+which svgbob
+--- omd:install
+echo "Please install svgbob from https://github.com/ivanceras/svgbob; for example via cargo install svgbob_cli"
+exit 1
+```
+
+```{configure gnuplot}
+# Note: svgbob processes STDIN into STDOUT
+svgbob
+--- omd:check
+which gnuplot
+--- omd:install
+echo "Please install gnuplot; for example via brew install gnuplot"
+exit 1
+```
+
+```{configure plot}
+gnuplot -p -e "set terminal png size 1000,700 enhanced font \"Courier\"; set output 'output.png'; set datafile separator ','; plot '-' w l "
+```
+
+```{sql | plot}
+SELECT num, num * num * num AS square FROM generate_series(1, 36) as a(num)
+---
+set datafile separator ',';
+set terminal png size 1000,700 enhanced font \"Courier\"; 
+set output 'output.png';
+plot '-' w l 
+```
+
+```{plot line}
+gnuplot -p -e "set terminal png size 1000,700 enhanced font \"Courier\"; set output 'output.png'; set datafile separator ','; plot '-' w l "
+```
+
+
+__END__
+
+echo "SELECT num, num * num * num AS square FROM generate_series(1, 36) as a(num)" |    echo "copy ($(cat)) TO STDOUT WITH CSV" |    psql |    gnuplot -p -e "set terminal png size 1000,700 enhanced font \"Courier\"; set output 'output.png'; set datafile separator ','; plot '-' w l "
+
+
+brew install gnuplot
+
+
+```{sql}
+SELECT num, num * num AS square FROM generate_series(1, 6) as a(num)
+--- 
+```
+
+# This block defines a psql rendering instruction
+
+```{omd psql}
+--- omd:check
+# see https://www.postgresql.org/docs/current/app-psql.html#APP-PSQL-META-COMMANDS-COPY
+# psql 12 has a psql --csv flag
+psql -c '\copy (select 1) TO STDOUT WITH CSV'
+
+--- omd:setup
+psql postgres-dump.sql
+
+--- omd:run
+# Note that we do not run "\copy", but "copy". This lets us run multiline selects.
+# The input must still be a single SELECT!
+echo "copy ($(cat)) TO STDOUT WITH CSV" | psql
+```
+
+
+__END__
+
+```{comment}
+This document is intended for processing via the OMD markdown preprocessor
+https://github.com/radiospiel/omd
+```
+
+```{@bash}
+figlet "Oh My Doc!"
+```
+
+# Oh My Doc!
+
+"Oh My Doc" –– or, short, `omd`, is a preprocessor which lets an author write markdown containing code. When preprocessing the document `omd` executes this code and embeds the results into the generated markdown output. For example, the logo above is generated via OMD's shell integration and the figlet command. Still, *omd's* input still looks like and very much is markdown.
+
+The capability to embed code and its output should help you write about and discuss code or data. One could see `omd` as a server-less, lightweight, alternative to a Jypiter Notebook. 
+
+Currently *omd* supports the following input:
+
+- Shell commands
+- C language programs: they are compiled and executed; their output is embedded verbatim in the output;
+- Ruby programs: they are executed; their output is embedded verbatim in the output;
+- Graphviz dot scripts: they are rendered into images that then are embedded into the output;
+- SQL commands: they are executed via a psql session; the output is rendered into a table;
+- svgbob diagrams: they are executed via svgbob and embedded as a SVG image.
+
+More details on omd processing instructions can be found below.
+
+## Security warning
+
+Since the embedded scripts's functionality is by intention not crippled, a document, when run through *omd*, could be harmful. **You should therefore never open a OMD file that you didn't write yourself or inspected properly.**
+
+You have been warned.
+
+## Installation
+
+1. Have a recent ruby version
+2. Make sure bundler is installed: `gem install bundler`
+3. Copy the script `bin/omd` into a location in your path.
+
+*omd* uses a inline bunder setup; the first time you run it it will fetch some dependencies from rubygems.
+
+<!--BREAK-->
+
+## Command line usage
+
+To process an input file run
+
+    omd process [ --clean ] [ --display ] <src> [ --output=<dest> ]
+
+To continuously watch the input file for changes and rebuild when necessary run
+
+    omd watch [ --clean ] [ --display ] <src> [ --output=<dest> ]
+
+Command line flags are:
+
+- **`--clean`** *omd* manages a cache of command executions. The `--clean` command line argument makes sure to purge the cache, effectively rebuilding the entire document.
+- **`--display`** start the *Marked 2* OSX application to display the generated result. *Marked 2* watches input document for changes, automatically refreshing whenever necessary.
+
+<!--BREAK-->
+
+# *omd* input files
+
+In general, *omd* only deals with code blocks like the following, leaving everything else alone:
+
+    ```{cc}
+    #include <stdio.h>
+
+    int main() {
+      printf("Hello omd!\n"); return 0;
+    }
+    ```
+
+
+The characters between `{` and `}` in the opening fence describe ***omd* processing instructions**. They define the expected syntax in the code block. If a code block's processing instruction is supported by *omd* the embedded program is build and run, and its output is captured and embedded into the resulting markdown file.
+
+## Controlling the display of the code block
+
+When `omd` detects a code block it copies the code block into the output, followed by the code's output. It is possible to suppress either the entire source code block, leaving only the result in the output, by prepending the codeblock marker with a `@` character:
+
+    ```{@cc}
+    #include <stdio.h>
+    
+    int main() {
+      printf("You should not see my source!\n"); return 0;
+    }
+    ```
+
+resulting in
+
+```{@cc}
+#include <stdio.h>
+
+int main() {
+  printf("You should not see my source!\n"); return 0;
+}
+```
+
+Alternatively, to hide some, but not all of the input, prepend these lines with an `@` character:
+
+    ```{cc}
+    @#include <stdio.h>
+    
+    int main() {
+      printf("The #include line should not be seen here.\n"); return 0;
+    }
+    ```
+
+resulting in
+
+```{cc}
+@#include <stdio.h>
+
+int main() {
+  printf("The #include line should not be seen here.\n"); return 0;
+}
+```
+
+
+## Comments
+
+A comment block is not rendered in the output.
+
+    ```{comment}
+    This document is intended for processing with OMD  
+    https://github.com/radiospiel/omd
+    ```
+
+## C: the `{cc}` processing instruction
+
+The following block is compiling a C program and rendering both the source code and the output of the command. Lines starting with `@` are omitted from the output:
+
+    ```{cc}
+        @ #include <stdio.h>
+        @ #include <stdlib.h>
+        
+        int fib(int n) {
+          return n < 3 ? 1 : fib(n-1) + fib(n-2);
+        }
+    
+        int main(int argc, char** argv) {
+          int n = atoi(argv[1]);
+          printf("Fibonacci number of %d is %d\n", n, fib(n));
+        }
+    ```
+
+The result looks like this:
+
+```{cc}
+    @ #include <stdio.h>
+    @ #include <stdlib.h>
+    
+    int fib(int n) {
+      return n < 3 ? 1 : fib(n-1) + fib(n-2);
+    }
+
+    int main(int argc, char** argv) {
+      int n = atoi(argv[1]);
+      printf("Fibonacci number of %d is %d\n", n, fib(n));
+    }
+```
+
+## svgbob: the `{bob}` processing instruction
+
+The following block is being run through svgbob. The graph is then embedded as an SVG image:
+
+    ```{bob}
+    o->  Sequence Diagrams
+    
+                                       .--->  F
+              A       B      C  D     /
+              *-------*-----*---*----*----->  E
+                       \            ^ \
+                        v          /   '--->  G
+                         B --> C -'
+    ```
+
+The result looks like this:
+
+```{@bob}
+o->  Sequence Diagrams
+
+                                   .--->  F
+          A       B      C  D     /
+          *-------*-----*---*----*----->  E
+                   \            ^ \
+                    v          /   '--->  G
+                     B --> C -'
+```
+
+
+## Graphviz: the `{dot}` processing instruction
+
+The following block is being run through Graphviz`s `dot` command to generate a graph. The graph is then embedded as an image:
+
+    ```{dot}
+    digraph finite_state_machine {
+	    rankdir=LR;
+	    node [shape = square];
+	    LR_0 -> LR_2 [ label = "foobar" ];
+	    LR_0 -> LR_1 [ label = "SS(S)" ];
+	    LR_1 -> LR_3 [ label = "S($start)" ];
+    }
+    ```
+
+The result looks like this:
+
+```{dot}
+digraph finite_state_machine {
+	rankdir=LR;
+	node [shape = square];
+	LR_0 -> LR_2 [ label = "foobar" ];
+	LR_0 -> LR_1 [ label = "SS(S)" ];
+	LR_1 -> LR_3 [ label = "S($start)" ];
+}
+```
+
+## mermaid: the `{mermaid}` processing instruction
+
+The following block is being run through mermaidjs' command line to generate an image.
+
+    ```{mermaid}
+    gantt
+        title A Gantt Diagram
+        dateFormat  YYYY-MM-DD
+        section Section
+        A task           :a1, 2014-01-01, 30d
+        Another task     :after a1  , 20d
+        section Another
+        Task in sec      :2014-01-12  , 12d
+        another task      : 24d
+    ```
+
+```{@mermaid}
+gantt
+    title A Gantt Diagram
+    dateFormat  YYYY-MM-DD
+    section Section
+    A task           :a1, 2014-01-01, 30d
+    Another task     :after a1  , 20d
+    section Another
+    Task in sec      :2014-01-12  , 12d
+    another task      : 24d
+```
+
+## Shell code: the `{bash}` processing instruction
+
+The following block is running a shell script:
+
+    ```{bash}
+		fortune all
+    ```
+
+The result looks like this:
+
+```{bash}
+fortune all
+```
+
+## SQL: the `{sql}` processing instruction
+
+The following block is being executed as a SQL command:
+
+    ```{sql}
+    SELECT
+      num,
+      num * num AS square
+    FROM
+      generate_series(1, 6) as a(num)
+    ```
+
+The result looks like this:
+
+```{sql}
+SELECT
+  num,
+  num * num AS square
+FROM
+  generate_series(1, 6) as a(num)
+```
+
+The SQL code is executed as a SQL command via the `psql` command. A default installation of postgresql should be suitable to run this code. Generally the following commands should get you started:
+
+```bash
+  # on Ubuntu
+  sudo apt-get install postgresql 
+  
+  # on OSX
+  brew install postgresql
+  
+  # setup a default database
+  createuser $(whoami)
+  createdb $(whoami)
+```
+
+
+## Controlling the display mode
+
+The above examples use some default display mode to print the result. `omd` also allows you to override this. The following example runs git diff on a file in this repository, formatting the output in diff mode:
+
+    ```{@bash | diff}
+    git diff cb6e2b0a~ cb6e2b0a
+    ```
+
+The result looks like this:
+
+```{@bash | diff}
+git diff --unified=2 cb6e2b0a~ cb6e2b0a -- bin/omd
+```
+
+
+<!--BREAK-->
+
+## Hint
+
+When viewing the README.md file generated via omd in "Marked 2" you will notice that "Marked 2" replaces fenced code blocks with intendations with the last of those blocks in the input file. This seems to be an issue with "Marked 2". This should not affect the usefulness of the *omd* + *Marked 2* combination outside of this document though. 
+
+```
+Marked 2 has trouble with fenced code blocks with intendation.
+This document is rendered incorrectly in Marked 2.
+```

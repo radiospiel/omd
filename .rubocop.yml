@@ -60,7 +60,23 @@ Style/SafeNavigation:
 Lint/MissingCopEnableDirective:
   Enabled: false
 
-Performance/RegexpMatch:
+Style/NonNilCheck:
   Enabled: false
 
+Lint/BooleanSymbol:
+  Enabled: false
 
+Style/TrailingUnderscoreVariable:
+  Enabled: false
+
+Style/StderrPuts:
+  Enabled: false
+
+Style/PercentLiteralDelimiters:
+  Enabled: false
+
+Style/ParallelAssignment:
+  Enabled: false
+
+Style/ClassVars:
+  Enabled: false

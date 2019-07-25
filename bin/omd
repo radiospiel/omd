@@ -52,6 +52,15 @@ module OMD::CLI
 
   public
 
+
+  # read from stdin, send to psql
+  def psql
+    sql = STDIN.read
+    sql = <<~SQL
+
+    SQL
+  end
+
   # Process src file, and process into a destination file
   #
   # Flags:
