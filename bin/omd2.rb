@@ -724,6 +724,9 @@ module OMD::CLI
   # Reads the file, collecting information about all required modes, and installs
   # all missing modes.
   def modes_install(file)
+    logger.info "Processing #{file}"
+    Processors.process_configurations(File.read(file))
+
     data = File.read(file)
     Processors.missing_modes(data).each do |mode_name|
       Registry[mode_name].run(:install)
@@ -786,4 +789,41 @@ cat mmdc.png
 which mmdc
 --- omd:install.osx
 npm install -g mermaid
+```
+
+```{@configure figlet}
+figlet
+--- omd:check
+which svgbob
+--- omd:install.osx
+brew install figlet
+```
+
+```{@configure fviz}
+fviz
+--- omd:check
+which fviz
+--- omd:install
+set -eu -o pipefail
+
+brew list || grep -w fmt > /dev/null fmt
+brew list || grep -w harfbuzz > /dev/null harfbuzz
+brew list || grep -w freetype > /dev/null freetype
+brew list || grep -w cairo > /dev/null cairo
+brew list || grep -w cmake > /dev/null cmake
+
+# arena=$(mktemp -d)
+arena=vendor/fviz
+mkdir -p "$arena"
+cd "$arena"
+if [ -d fviz ]; then
+  cd fviz
+  git pull
+else
+  git clone https://github.com/asmuth/fviz.git
+  cd fviz
+fi
+cmake .
+make -j
+make install
 ```

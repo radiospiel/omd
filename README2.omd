@@ -1,3 +1,36 @@
+```{configure fviz tmp_dir:false}
+cat > fviz.in << EOF
+(chart/scatterplot
+    data-x (csv gauss2d.csv x)
+    data-y (csv gauss2d.csv y)
+    limit-x (0 400)
+    limit-y (0 200)
+    axes (bottom left)
+    grid (color #fff)
+    background #eee
+    border none)
+EOF
+
+fviz --in fviz.in --out fviz.png
+cat fviz.png
+```
+
+```{@figlet}
+Oh My Doc (2)!
+```
+
+```{@fviz}
+(chart/scatterplot
+    data-x (csv tests/testdata/gauss2d.csv x)
+    data-y (csv tests/testdata/gauss2d.csv y)
+    limit-x (0 400)
+    limit-y (0 200)
+    axes (bottom left)
+    grid (color #fff)
+    background #eee
+    border none)
+```    
+
 The following describes a mermaid sequenceDiagram
 
 ```{mermaid}
@@ -131,6 +164,7 @@ partition Orchestra #CCCCEE {
 
 @enduml
 ```
+
 
 __END__
 
