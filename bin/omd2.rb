@@ -41,7 +41,7 @@ module OMD
   extend self
 
   def logger
-    OMD::CLI.logger
+    ::OMD::CLI.logger
   end
 
   # various helper functions
@@ -124,8 +124,8 @@ module OMD
   module H
     @@cache = PStore.new(File.join(Dir.getwd, ".omd2.pstore"))
     @@cache.ultra_safe = true
-    
-    def cached(*keys, &block)
+
+    def cached(*keys)
       # key = Digest::MD5.hexdigest(OMD::SourceVersion.source_version + ":" + parts.join(","))
       key = Digest::MD5.hexdigest(keys.join(","))
 
@@ -170,16 +170,16 @@ module OMD::CLI
   extend self
   include ::Simple::CLI
 
-  H = OMD::H
+  H = ::OMD::H
 
   # Process an OMD file
   def process(file)
     data = File.read(file)
 
     H.with_runtime_log "Processing #{file}" do
-      Processors.process_configurations(data)
+      ::OMD::Processors.process_configurations(data)
 
-      missing_modes = Processors.missing_modes(data)
+      missing_modes = ::OMD::Processors.missing_modes(data)
       unless missing_modes.empty?
         die! <<~MSG
           Some modes (#{missing_modes.join(", ")}) are not properly installed, aborting...
@@ -188,524 +188,23 @@ module OMD::CLI
         MSG
       end
 
-      Processors.process(data)
+      ::OMD::Processors.process(data)
     end
   end
 
-  module Target
-    extend self
-
-    def open
-      File.open "target.md", "w" do |out|
-        @out = out
-        @data_dir = "target.md.data"
-        FileUtils.mkdir_p @data_dir
-        yield
-      ensure
-        @out = nil
-      end
-    end
-
-    def write(data)
-      @out.puts data
-    end
-
-    def add_source(text, source_type:)
-      add_text_plain text, source_type: source_type
-    end
-
-    def add(mime_type, data, alt:)
-      if mime_type == :auto
-        mime_type = determine_type(data)
-      end
-
-      case mime_type
-      when "text/plain"
-        add_text_plain(data)
-      when "image/png", "image/jpeg"
-        dest_path = @data_dir + "/" + Digest::MD5.hexdigest(data) + ".png"
-        File.write dest_path, data
-        write "![#{alt}](#{dest_path})"
-      else
-        add_text_plain <<~MARKDOWN
-          > Don't know how to embed a #{mime_type.inspect} block.
-        MARKDOWN
-      end
-    end
-
-    def determine_type(data)
-      require "filemagic"
-      mime_type, _encoding = FileMagic.mime.buffer(data).split(";", 2)
-      mime_type
-    end
-
-    def add_text_plain(data, source_type: nil)
-      data = data.gsub(/\n\z/, "")
-
-      write <<~RESULT
-        ```#{source_type}
-        #{data}
-        ```
-
-      RESULT
-    end
-  end
-
-  module Runner
-    extend self
-
-    def run!(omd_command, body, silent:)
-      return if omd_command =~ /^!/
-
-      # print source for block.
-      print_block_input(omd_command, body) unless silent
-
-      # run the block.
-      result_type, result_data = H.cached(Registry.cache_key, omd_command, body) do
-        run_uncached(omd_command, body)
-      end
-
-      # print result.
-      Target.add(result_type, result_data, alt: omd_command)
-    end
-
-    private
-
-    def print_block_input(omd_command, body)
-      parts = Shellwords.shellsplit(omd_command)
-      pipeline = Enumerable.split(parts, "|")
-
-      mode = Registry[pipeline.first.first]
-
-      #
-      # If ignore_empty_lines is set (which is the default), remove all lines
-      # starting with "@", then remove all leading and trailing empty lines.
-      #
-      if mode.flag(:ignore_empty_lines)
-        body = body.gsub(/^@.*/, "").gsub(/\A\n*/, "").gsub(/\n*\z/, "")
-      end
-
-      #
-      # send block to Target
-      Target.add_source(body, source_type: mode.flag(:source_type))
-    end
-
-    def run_uncached(omd_command, body)
-      silence = omd_command.gsub!(/^@/, "") != nil
-      return if silence
-
-      # omd_command contains a string with the commands for the omd processing
-      # pipe for the current block; for example "@sql | plot lines"; convert
-      # this into a pipeline.
-      parts = Shellwords.shellsplit(omd_command)
-      pipeline = Enumerable.split(parts, "|")
-
-      mode = Registry[pipeline.first.first]
-
-      # To run the pipeline we remove the '@' markers from all lines in the body
-      # - but in contrast to echo_body we'll keep the rest of these lines, and
-      # we do not skip over empty lines at all.
-      input_data = body
-      input_data = input_data.gsub(/^@/, "") if mode.flag(:ignore_empty_lines)
-
-      # run the pipeline
-      run_pipeline(pipeline, [:auto, input_data])
-    end
-
-    def run_pipeline(pipeline, data)
-      pipeline.inject(data) do |input, (mode_name, *args)|
-        H.with_runtime_log "Running #{H.shell_inspect mode_name, *args}" do
-          run_stage mode_name, *args, input: input
-        end
-      end
-    end
-
-    # runs a stage. The stage is defined by the mode_name, optional arguments,
-    # and the input data. It returns a result.
-    #
-    # input and result are a [content_type, blob] tuple. If a stage wants to
-    # handle input types they should use the OMD_INPUT_TYPE environment
-    # variable.
-    #
-    def run_stage(mode_name, *args, input:)
-      mode = Registry[mode_name]
-
-      in_target_dir(mode) do
-        sh_file = File.join Dir.getwd, "omd.sh.#{$$}"
-
-        with_tmp_files([sh_file]) do
-          File.write sh_file, mode.command(:run), permissions: 0o700
-
-          input_type, input_data = *input
-
-          env = { "OMD_INPUT_TYPE" => input_type.to_s }
-
-          stdout_str, stderr_str, status = ::OMD::H.capture3("./omd.sh.#{$$}", *args, stdin_data: input_data, env: env)
-
-          if status.exitstatus == 0
-            [:auto, stdout_str]
-          else
-            OMD.logger.error "#{mode} failed with exitstatus #{status.exitstatus}."
-            OMD.logger.warn(stderr_str) if stderr_str != ""
-            OMD.logger.warn "=== command output:\n#{stdout_str}" if stdout_str != ""
-
-            result = []
-            result << "=== #{mode} failed with exitstatus #{status.exitstatus}."
-            result << "--- command output:\n#{stdout_str}" if stdout_str != ""
-            result << "--- error output:\n#{stderr_str}" if stderr_str != ""
-            result << ""
-            result = result.join("\n")
-
-            [:auto, result]
-          end
-        end
-      end
-    end
-
-    def in_target_dir(mode)
-      if mode.flag(:tmp_dir)
-        Dir.mktmpdir do |tmpdir|
-          OMD.logger.debug "chdir #{tmpdir}"
-          Dir.chdir tmpdir do
-            yield
-          end
-        end
-      else
-        yield
-      end
-    end
-
-    def with_tmp_files(files)
-      yield
-    ensure
-      files.each do |path|
-        File.unlink(path)
-      end
-    end
-  end
-
-  # A Mode description
-  #
-  # ...collects information about various aspects of a mode.
-  #
-  # For example, the "cc" default mode (as defined towards the end of this file,
-  # see the part after __END__) describes cc mode with these attributes:
-  #
-  # - <tt>:check</tt>: commands to check that the mode is available: "which cc"
-  # - <tt>:install</tt>: commands to install the reprequisites for this mode: "brew install gcc"
-  # - <tt>:run</tt>: commands to convert the input data (which has to be read from stdin)
-  #          into the result of this mode (in stdout)
-  # - <tt>:source_type</tt> a string which will be used to mark the input source
-  #
-  # A mode can be run via <tt>run_mode(mode, silent)</tt>
-  #
-  # The mode registry can be viewed via the command line via
-  #
-  #    omd modes [<name> ..]
-  class Mode
-    H = ::OMD::H
-
-    attr_reader :name
-    attr_reader :flags
-    attr_reader :commands
-
-    def initialize(name)
-      @name = name
-      @commands = {}
-
-      @flags = defaults_flags
-    end
-
-    def defaults_flags
-      {
-        "ignore_empty_lines" => true,
-        "tmp_dir" => true,
-        "source_type" => name
-      }
-    end
-
-    def run(command_name)
-      H.sh command(command_name)
-    end
-
-    def command(name)
-      commands["#{name}.#{H.os}"] || commands[name.to_s]
-    end
-
-    FLAGS = %w(ignore_empty_lines tmp_dir source_type).freeze
-
-    def flag(name)
-      flags[name.to_s]
-    end
-
-    def set_flag(name, value)
-      expect! name => FLAGS
-
-      value = nil if value == "null"
-      value = H.to_b(value) if %w(ignore_empty_lines tmp_dir).include?(name)
-
-      flags[name] = value
-    end
-
-    SECTIONS = %w(run check install).freeze
-
-    def set_command(section_name, section)
-      expect! section_name.split(".", 2).first => SECTIONS
-
-      section = nil if section == ""
-      expect! section_name.split(".", 2).first
-      commands[section_name] = section
-    end
-
-    def description
-      lines = []
-      
-      lines << "=== #{name} " + "=" * (70 - name.length) + "\n"
-      lines << command("run")
-
-      parts = []
-      parts << ["omd:flags",    flags.pretty_inspect] unless flags.empty? || flags == defaults_flags
-      parts << ["omd:check",    command("check")] if command("check")
-      parts << ["omd:install",  command("install")] if command("install")
-
-      parts.each do |section, data|
-        lines << "--- #{section} " + "-" * (70 - section.length) + "\n"
-        lines << data
-      end
-      
-      lines.join("")
-    end
-
-    def print
-      puts description
-      puts
-    end
-
-    def to_s
-      name
-    end
-
-    def inspect
-      keys = (instance_variables - [:@name]).map { |s| s.inspect.gsub(/^:@/, ":") }
-      "<Mode: #{name.inspect}, w/#{keys.join(", ")}>"
-    end
-  end
-
-  module Processors
-    extend self
-
-    module Parsers
-      extend self
-
-      # Parse an omd data blob. Returns an array of [ omd_mode, data ] tuples
-      def parse_omd(data)
-        current_mode = "passthrough"
-        current_block = []
-
-        data.each_line do |line|
-          break if line == "__END__\n"
-
-          # rubocop:disable Style/IfInsideElse
-          if current_mode != "passthrough"
-            if line =~ /^```\n/
-              yield current_mode, current_block.join
-              current_block = []
-              current_mode = "passthrough"
-            else
-              current_block << line
-            end
-          else
-            if line =~ /^```{\s*(.*)\s*}\n/
-              yield current_mode, current_block.join
-              current_block = []
-              current_mode = $1
-            else
-              current_block << line
-            end
-          end
-          # rubocop:enable Style/IfInsideElse
-        end
-
-        raise ArgumentError, "current_mode must be 'passthrough', but is #{current_mode.inspect}" if current_mode != "passthrough"
-
-        yield current_mode, current_block.join unless current_block.empty?
-      end
-
-      # returns a Mode object
-      def parse_configuration(body)
-        current_mode = "run"
-        current_block = []
-
-        body.each_line do |line|
-          case line
-          when /^--- omd:(.+)$/
-            yield current_mode, current_block.join
-
-            current_mode = $1
-            current_block = []
-          else
-            current_block << line
-          end
-        end
-
-        yield current_mode, current_block.join
-      end
-    end
-
-    def referenced_modes(data)
-      modes = []
-
-      Parsers.parse_omd(data) do |omd_command, _body|
-        omd_mode, *_ = Shellwords.shellsplit omd_command
-        next if respond_to?(omd_mode)
-        next if omd_mode =~ /^!/
-
-        omd_mode.gsub!(/^@/, "")
-
-        modes << omd_mode
-      end
-
-      modes.compact.sort
-    end
-
-    def check_mode(mode_name)
-      logger = OMD.logger
-
-      unless (mode = Registry[mode_name])
-        raise "The input uses a mode without definition: #{mode_name.inspect}"
-      end
-
-      if !mode.command(:check) || mode.run(:check)
-        logger.debug "#{mode_name}: OK."
-        return true
-      end
-
-      logger.error "#{mode_name}: check failed."
-      false
-    end
-
-    def missing_modes(data)
-      referenced_modes(data).reject { |mode_name| check_mode(mode_name) }
-    end
-
-    def process_configurations(data)
-      Parsers.parse_omd(data) do |omd_command, body|
-        silent = omd_command.start_with?("@")
-        omd_command = omd_command[1..-1] if silent
-
-        omd_mode, *args = Shellwords.shellsplit omd_command
-        next unless omd_mode == "configure"
-
-        configure(*args, body, silent: true)
-      end
-    end
-
-    def process(data)
-      Target.open do
-        Parsers.parse_omd(data) do |omd_command, body|
-          silent = omd_command.start_with?("@")
-          omd_command = omd_command[1..-1] if silent
-
-          omd_mode, *args = Shellwords.shellsplit omd_command
-
-          if respond_to?(omd_mode)
-            send(omd_mode, *args, body, silent: silent)
-          else
-            Runner.run!(omd_command, body, silent: silent)
-          end
-        end
-      end
-    end
-
-    def passthrough(data, silent:)
-      _ = silent
-      Target.write data
-    end
-
-    # implements the <tt>{@configure|configure mode_name [ option ... ]}</tt>
-    # command
-    #
-    # - mode_name: the name of the mode, e.g. "plantuml"
-    # - args: additional flags, e.g. ["ignore_empty_lines:false", "tmp_dir:true"]
-    # - body: mode definition, might contain multiple sections, for example
-    #
-    #               set -eu -o pipefail
-    #               plantuml -failfast2 -pipe > omd.png
-    #               ls -l $(pwd)
-    #               --- omd:check
-    #               which plantuml
-    #               --- omd:install
-    #               which javac || brew cask install adoptopenjdk
-    #               brew install plantuml
-    #
-    def configure(mode_name, *args, body, silent:)
-      mode = Mode.new(mode_name)
-
-      unless silent
-        Target.write <<~MARKDOWN
-
-              ```{configure #{mode_name}}
-          #{body.gsub(/\n\z/, "").gsub(/^/, "    ")}
-              ```
-        MARKDOWN
-      end
-
-      args.each do |arg|
-        expect! arg => /.:./
-        key, value = arg.split(":", 2)
-        mode.set_flag key, value
-      end
-
-      # Register configuration sections in mode.
-      Parsers.parse_configuration(body) do |section_name, section|
-        mode.set_command(section_name, section)
-      end
-      OMD.logger.debug "parsed #{mode} configuration", mode
-
-      Registry.register mode
-    end
-  end
-
-  module Registry
-    @@registry = {}
-
-    def self.cache_key
-      @@registry.values.sort_by(&:name).map(&:description).join(",")
-    end
-
-    def self.modes
-      @@registry.values
-    end
-
-    def self.register(mode)
-      @@registry[mode.name] = mode
-    end
-
-    def self.[](name)
-      @@registry[name.to_s]
-    end
-
-    def self.load_embedded_configuration!(file)
-      embedded_configuration = File.read(file).split("\n__END__\n").last
-      Processors.process_configurations(embedded_configuration)
-    end
-
-    load_embedded_configuration! __FILE__
-  end
-
-  # print all modes in the Registry
+  # print all modes in the registry
   #
   # When a file is passed to this command, modes that are defined in the file
   # are considered in addition to the modes embedded in omd.
   def modes(file = nil)
     if file
       logger.info "Processing #{file}"
-      Processors.process_configurations(File.read(file))
+      ::OMD::Processors.process_configurations(File.read(file))
     end
 
     logger.info "Note that the commands listed below are relevant for the current platform (#{H.os}) only."
 
-    Registry.modes.sort_by(&:name).each(&:print)
+    ::OMD::Mode.all.sort_by(&:name).each(&:print)
   end
 
   # check modes in a omd file
@@ -714,7 +213,7 @@ module OMD::CLI
   # that all modes are properly installed.
   def modes_check(file)
     data = File.read(file)
-    return if Processors.missing_modes(data).empty?
+    return if ::OMD::Processors.missing_modes(data).empty?
 
     exit 1
   end
@@ -724,14 +223,519 @@ module OMD::CLI
   # Reads the file, collecting information about all required modes, and installs
   # all missing modes.
   def modes_install(file)
-    logger.info "Processing #{file}"
-    Processors.process_configurations(File.read(file))
-
     data = File.read(file)
-    Processors.missing_modes(data).each do |mode_name|
-      Registry[mode_name].run(:install)
+
+    logger.info "Processing #{file}"
+    ::OMD::Processors.process_configurations(data)
+
+    ::OMD::Processors.missing_modes(data).each do |mode_name|
+      ::OMD::Mode.registry[mode_name].run(:install)
     end
   end
+end
+
+module OMD::Target
+  extend self
+
+  def open
+    File.open "target.md", "w" do |out|
+      @out = out
+      @data_dir = "target.md.data"
+      FileUtils.mkdir_p @data_dir
+      yield
+    ensure
+      @out = nil
+    end
+  end
+
+  def write(data)
+    @out.puts data
+  end
+
+  def add_source(text, source_type:)
+    add_text_plain text, source_type: source_type
+  end
+
+  def add(mime_type, data, alt:)
+    if mime_type == :auto
+      mime_type = determine_type(data)
+    end
+
+    case mime_type
+    when "text/plain"
+      add_text_plain(data)
+    when "image/png", "image/jpeg"
+      dest_path = @data_dir + "/" + Digest::MD5.hexdigest(data) + ".png"
+      File.write dest_path, data
+      write "![#{alt}](#{dest_path})"
+    else
+      add_text_plain <<~MARKDOWN
+        > Don't know how to embed a #{mime_type.inspect} block.
+      MARKDOWN
+    end
+  end
+
+  def determine_type(data)
+    require "filemagic"
+    mime_type, _encoding = FileMagic.mime.buffer(data).split(";", 2)
+    mime_type
+  end
+
+  def add_text_plain(data, source_type: nil)
+    data = data.gsub(/\n\z/, "")
+
+    write <<~RESULT
+      ```#{source_type}
+      #{data}
+      ```
+
+    RESULT
+  end
+end
+
+module OMD::Runner
+  extend self
+
+  H = ::OMD::H
+
+  def run!(omd_command, body, silent:)
+    return if omd_command =~ /^!/
+
+    # print source for block.
+    print_block_input(omd_command, body) unless silent
+
+    # run the block.
+    result_type, result_data = run_block(omd_command, body)
+
+    # print result.
+    ::OMD::Target.add(result_type, result_data, alt: omd_command)
+  end
+
+  private
+
+  def print_block_input(omd_command, body)
+    parts = Shellwords.shellsplit(omd_command)
+    pipeline = Enumerable.split(parts, "|")
+
+    mode = ::OMD::Mode.registry[pipeline.first.first]
+
+    #
+    # If ignore_empty_lines is set (which is the default), remove all lines
+    # starting with "@", then remove all leading and trailing empty lines.
+    #
+    if mode.flag(:ignore_empty_lines)
+      body = body.gsub(/^@.*/, "").gsub(/\A\n*/, "").gsub(/\n*\z/, "")
+    end
+
+    #
+    # send block to Target
+    ::OMD::Target.add_source(body, source_type: mode.flag(:source_type))
+  end
+
+  def run_block(omd_command, body)
+    silence = omd_command.gsub!(/^@/, "") != nil
+    return if silence
+
+    # omd_command contains a string with the commands for the omd processing
+    # pipe for the current block; for example "@sql | plot lines"; convert
+    # this into a pipeline.
+    parts = Shellwords.shellsplit(omd_command)
+    pipeline = Enumerable.split(parts, "|")
+
+    # Before we run the pipeline we need to remove any leading '@' markers
+    # from all lines in the body unless ignore_empty_lines is disabled.
+    # In contrast to echo_body we'll keep the rest of these lines, and
+    # we do not skip over empty lines at all.
+    first_mode = ::OMD::Mode.registry[pipeline.first.first]
+    body = body.gsub(/^@/, "") if first_mode.flag(:ignore_empty_lines)
+
+    # run the pipeline
+    run_pipeline(pipeline, [:auto, body])
+  end
+
+  def run_pipeline(pipeline, data)
+    pipeline.inject(data) do |input, (mode_name, *args)|
+      mode = ::OMD::Mode.registry[mode_name]
+      run_stage_cached mode, *args, input: input
+    end
+  end
+
+  def run_stage_cached(mode, *args, input:)
+    H.cached(mode.cache_key, *args, input) do
+      H.with_runtime_log "Running #{H.shell_inspect mode.name, *args}" do
+        run_stage(mode, *args, input: input)
+      end
+    end
+  end
+
+  # runs a stage. The stage is defined by the mode_name, optional arguments,
+  # and the input data. It returns a result.
+  #
+  # input and result are a [content_type, blob] tuple. If a stage wants to
+  # handle input types they should use the OMD_INPUT_TYPE environment
+  # variable.
+  #
+  def run_stage(mode, *args, input:)
+    in_target_dir(mode) do
+      sh_file = File.join Dir.getwd, "omd.sh.#{$$}"
+
+      with_tmp_files([sh_file]) do
+        File.write sh_file, mode.command(:run), permissions: 0o700
+
+        input_type, input_data = *input
+
+        env = { "OMD_INPUT_TYPE" => input_type.to_s }
+
+        stdout_str, stderr_str, status = ::OMD::H.capture3("./omd.sh.#{$$}", *args, stdin_data: input_data, env: env)
+
+        if status.exitstatus == 0
+          [:auto, stdout_str]
+        else
+          OMD.logger.error "#{mode} failed with exitstatus #{status.exitstatus}."
+          OMD.logger.warn(stderr_str) if stderr_str != ""
+          OMD.logger.warn "=== command output:\n#{stdout_str}" if stdout_str != ""
+
+          result = []
+          result << "=== #{mode} failed with exitstatus #{status.exitstatus}."
+          result << "--- command output:\n#{stdout_str}" if stdout_str != ""
+          result << "--- error output:\n#{stderr_str}" if stderr_str != ""
+          result << ""
+          result = result.join("\n")
+
+          [:auto, result]
+        end
+      end
+    end
+  end
+
+  def in_target_dir(mode)
+    if mode.flag(:tmp_dir)
+      Dir.mktmpdir do |tmpdir|
+        OMD.logger.debug "chdir #{tmpdir}"
+        Dir.chdir tmpdir do
+          yield
+        end
+      end
+    else
+      yield
+    end
+  end
+
+  def with_tmp_files(files)
+    yield
+  ensure
+    files.each do |path|
+      File.unlink(path)
+    end
+  end
+end
+
+# A Mode description
+#
+# ...collects information about various aspects of a mode.
+#
+# For example, the "cc" default mode (as defined towards the end of this file,
+# see the part after __END__) describes cc mode with these attributes:
+#
+# - <tt>:check</tt>: commands to check that the mode is available: "which cc"
+# - <tt>:install</tt>: commands to install the reprequisites for this mode: "brew install gcc"
+# - <tt>:run</tt>: commands to convert the input data (which has to be read from stdin)
+#          into the result of this mode (in stdout)
+# - <tt>:source_type</tt> a string which will be used to mark the input source
+#
+# A mode can be run via <tt>run_mode(mode, silent)</tt>
+#
+# The mode registry can be viewed via the command line via
+#
+#    omd modes [<name> ..]
+class ::OMD::Mode
+  class << self
+    def registry
+      @registry ||= {}
+    end
+
+    def all
+      registry.values
+    end
+
+    def register(mode)
+      registry[mode.name.to_s] = mode
+    end
+  end
+
+  H = ::OMD::H
+
+  attr_reader :name
+  attr_reader :flags
+  attr_reader :commands
+
+  def initialize(name)
+    @name = name
+    @commands = {}
+
+    @flags = defaults_flags
+  end
+
+  def defaults_flags
+    {
+      "ignore_empty_lines" => true,
+      "tmp_dir" => true,
+      "source_type" => name
+    }
+  end
+
+  def run(command_name)
+    H.sh command(command_name)
+  end
+
+  def command(name)
+    commands["#{name}.#{H.os}"] || commands[name.to_s]
+  end
+
+  FLAGS = %w(ignore_empty_lines tmp_dir source_type).freeze
+
+  def flag(name)
+    flags[name.to_s]
+  end
+
+  def set_flag(name, value)
+    expect! name => FLAGS
+
+    value = nil if value == "null"
+    value = H.to_b(value) if %w(ignore_empty_lines tmp_dir).include?(name)
+
+    flags[name] = value
+  end
+
+  SECTIONS = %w(run check install).freeze
+
+  def set_command(section_name, section)
+    expect! section_name.split(".", 2).first => SECTIONS
+
+    section = nil if section == ""
+    expect! section_name.split(".", 2).first
+    commands[section_name] = section
+  end
+
+  def description
+    lines = []
+
+    lines << "=== #{name} " + "=" * (70 - name.length) + "\n"
+    lines << command("run")
+
+    parts = []
+    parts << ["omd:flags",    flags.pretty_inspect] unless flags.empty? || flags == defaults_flags
+    parts << ["omd:check",    command("check")] if command("check")
+    parts << ["omd:install",  command("install")] if command("install")
+
+    parts.each do |section, data|
+      lines << "--- #{section} " + "-" * (70 - section.length) + "\n"
+      lines << data
+    end
+
+    lines.join("")
+  end
+
+  def cache_key
+    description
+  end
+
+  def print
+    puts description
+    puts
+  end
+
+  def to_s
+    name
+  end
+
+  def inspect
+    keys = (instance_variables - [:@name]).map { |s| s.inspect.gsub(/^:@/, ":") }
+    "<Mode: #{name.inspect}, w/#{keys.join(", ")}>"
+  end
+end
+
+module OMD::Processors
+  extend self
+
+  module Parsers
+    extend self
+
+    # Parse an omd data blob. Returns an array of [ omd_mode, data ] tuples
+    def parse_omd(data)
+      current_mode = "passthrough"
+      current_block = []
+
+      data.each_line do |line|
+        break if line == "__END__\n"
+
+        # rubocop:disable Style/IfInsideElse
+        if current_mode != "passthrough"
+          if line =~ /^```\n/
+            yield current_mode, current_block.join
+            current_block = []
+            current_mode = "passthrough"
+          else
+            current_block << line
+          end
+        else
+          if line =~ /^```{\s*(.*)\s*}\n/
+            yield current_mode, current_block.join
+            current_block = []
+            current_mode = $1
+          else
+            current_block << line
+          end
+        end
+        # rubocop:enable Style/IfInsideElse
+      end
+
+      raise ArgumentError, "current_mode must be 'passthrough', but is #{current_mode.inspect}" if current_mode != "passthrough"
+
+      yield current_mode, current_block.join unless current_block.empty?
+    end
+
+    # returns a Mode object
+    def parse_configuration(body)
+      current_mode = "run"
+      current_block = []
+
+      body.each_line do |line|
+        case line
+        when /^--- omd:(.+)$/
+          yield current_mode, current_block.join
+
+          current_mode = $1
+          current_block = []
+        else
+          current_block << line
+        end
+      end
+
+      yield current_mode, current_block.join
+    end
+  end
+
+  def referenced_modes(data)
+    modes = []
+
+    Parsers.parse_omd(data) do |omd_command, _body|
+      omd_mode, *_ = Shellwords.shellsplit omd_command
+      next if respond_to?(omd_mode)
+      next if omd_mode =~ /^!/
+
+      omd_mode.gsub!(/^@/, "")
+
+      modes << omd_mode
+    end
+
+    modes.compact.sort
+  end
+
+  def check_mode(mode_name)
+    logger = OMD.logger
+
+    mode = ::OMD::Mode.registry[mode_name]
+
+    raise "The input uses a mode without definition: #{mode_name.inspect}" unless mode
+
+    if !mode.command(:check) || mode.run(:check)
+      logger.debug "#{mode_name}: OK."
+      return true
+    end
+
+    logger.error "#{mode_name}: check failed."
+    false
+  end
+
+  def missing_modes(data)
+    referenced_modes(data).reject { |mode_name| check_mode(mode_name) }
+  end
+
+  def process_configurations(data)
+    Parsers.parse_omd(data) do |omd_command, body|
+      silent = omd_command.start_with?("@")
+      omd_command = omd_command[1..-1] if silent
+
+      omd_mode, *args = Shellwords.shellsplit omd_command
+      next unless omd_mode == "configure"
+
+      configure(*args, body, silent: true)
+    end
+  end
+
+  def process(data)
+    ::OMD::Target.open do
+      Parsers.parse_omd(data) do |omd_command, body|
+        silent = omd_command.start_with?("@")
+        omd_command = omd_command[1..-1] if silent
+
+        omd_mode, *args = Shellwords.shellsplit omd_command
+
+        if respond_to?(omd_mode)
+          send(omd_mode, *args, body, silent: silent)
+        else
+          ::OMD::Runner.run!(omd_command, body, silent: silent)
+        end
+      end
+    end
+  end
+
+  def passthrough(data, silent:)
+    _ = silent
+    ::OMD::Target.write data
+  end
+
+  # implements the <tt>{@configure|configure mode_name [ option ... ]}</tt>
+  # command
+  #
+  # - mode_name: the name of the mode, e.g. "plantuml"
+  # - args: additional flags, e.g. ["ignore_empty_lines:false", "tmp_dir:true"]
+  # - body: mode definition, might contain multiple sections, for example
+  #
+  #               set -eu -o pipefail
+  #               plantuml -failfast2 -pipe > omd.png
+  #               ls -l $(pwd)
+  #               --- omd:check
+  #               which plantuml
+  #               --- omd:install
+  #               which javac || brew cask install adoptopenjdk
+  #               brew install plantuml
+  #
+  def configure(mode_name, *args, body, silent:)
+    mode = ::OMD::Mode.new(mode_name)
+
+    unless silent
+      ::OMD::Target.write <<~MARKDOWN
+
+            ```{configure #{mode_name}}
+        #{body.gsub(/\n\z/, "").gsub(/^/, "    ")}
+            ```
+      MARKDOWN
+    end
+
+    args.each do |arg|
+      expect! arg => /.:./
+      key, value = arg.split(":", 2)
+      mode.set_flag key, value
+    end
+
+    # Register configuration sections in mode.
+    Parsers.parse_configuration(body) do |section_name, section|
+      mode.set_command(section_name, section)
+    end
+    OMD.logger.debug "parsed #{mode} configuration", mode
+
+    ::OMD::Mode.register mode
+  end
+end
+
+#
+# load_embedded_configuration
+#
+begin
+  embedded_configuration = File.read(__FILE__).split("\n__END__\n").last
+  ::OMD::Processors.process_configurations(embedded_configuration)
 end
 
 OMD::CLI.run!(*ARGV)
