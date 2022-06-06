@@ -10,7 +10,7 @@ require "bundler/inline"
 gemfile do
   source "https://rubygems.org"
   gem "rb-fsevent", require: false
-  gem "simple-cli", require: false
+  gem "simple-cli", "~> 0.3", require: false
 end
 
 require "simple-cli"
@@ -25,7 +25,7 @@ module OMD
   extend self
 
   def logger
-    OMD::CLI.logger
+    Simple::CLI.logger
   end
 end
 
@@ -544,5 +544,5 @@ end
 
 unless $loaded
   $loaded = true
-  OMD::CLI.run!(*ARGV)
+  Simple::CLI.run!(OMD::CLI, *ARGV)
 end
