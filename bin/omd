@@ -11,6 +11,7 @@ gemfile do
   source "https://rubygems.org"
   gem "rb-fsevent", require: false
   gem "simple-cli", "~> 0.3.13", require: false
+  gem "sqlite3", require: false
 end
 
 require "simple-cli"
@@ -432,7 +433,7 @@ module OMD
 
     private
 
-    def requires_binary!(binary, installation)
+    def which!(binary, installation)
       return if H.which(binary)
 
       STDERR.puts <<~MSG
@@ -479,12 +480,10 @@ module OMD
     end
 
     def mermaid(filters, code_block, writer:)
-      requires_binary! "mmdc", "brew install mermaid-cli"
-      OMD.logger.warn "mermaid"
+      which! "mmdc", "brew install mermaid-cli"
+
       File.write("omd.mmd", code_block)
-      OMD.logger.warn "wrote mermaid file"
       result = H.sh! "mmdc -i omd.mmd -o mermaid.png"
-      OMD.logger.warn "got mermaid result"
       writer.image "mermaid.png", alt: "mermaid"
     end
 
@@ -516,9 +515,10 @@ module OMD
     end
 
     def sql(filters, code_block, writer:)
-      File.write("omd.sql", code_block)
+      which! "sqlite3", "brew install sqlite3"
 
-      success = H.sh! "psql -F'\t' --quiet --no-align -f omd.sql"
+      File.write("omd.sql", code_block)
+      success = H.sh! "sqlite3 -noheader -separator $'\t' < omd.sql"
       OMD.logger.success success
       writer.table(success, separator: "\t")
     end
@@ -554,7 +554,10 @@ module OMD
     end
   end
 
-  LANGS_IN_TMP_DIR = %w(bash)
+  # most languages are running inside a temp dir. bash isn't -
+  # because we assume that a bash script might want to access
+  # some local resources.
+  LANGS_NOT_RUNNING_IN_TMP_DIR = %w(bash)
 
   def process_code_block(intro, code_block, writer:)
     intro.gsub!(/^@\s*/, "")
@@ -568,7 +571,7 @@ module OMD
     logger.warn "processing an #{intro.inspect} block"
 
     # Some commands are running inside a temp dir.
-    run_in_tmp_dir = !LANGS_IN_TMP_DIR.include?(lang)
+    run_in_tmp_dir = !LANGS_NOT_RUNNING_IN_TMP_DIR.include?(lang)
 
     process_in_dir(tmpdir: run_in_tmp_dir) do
       code_block = code_block.gsub(/^@\s*/, "")

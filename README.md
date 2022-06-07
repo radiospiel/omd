@@ -235,14 +235,9 @@ The result looks like this:
 fortune all
 ```
 ```
-/*
- * [...] Note that 120 sec is defined in the protocol as the maximum
- * possible RTT.  I guess we'll have to use something other than TCP
- * to talk to the University of Mars.
- * PAWS allows us longer timeouts and large windows, so once implemented
- * ftp to mars will work nicely.
- */
-(from /usr/src/linux/net/inet/tcp.c, concerning RTT [retransmission timeout])
+Four fifths of the perjury in the world is expended on tombstones, women
+and competitors.
+		-- Lord Thomas Dewar
 ```
 
 ## SQL: the `{sql}` processing instruction
@@ -251,52 +246,41 @@ The following block is being executed as a SQL command:
 
     ```{sql}
     SELECT
-      num,
-      num * num AS square
-    FROM
-      generate_series(1, 6) as a(num)
+      value,
+      value * value AS square
+      FROM (
+        SELECT
+          value
+        FROM
+          generate_series(1, 6)
+      ) sq
     ```
 
 The result looks like this:
 
 ```sql
 SELECT
-  num,
-  num * num AS square
-FROM
-  generate_series(1, 6) as a(num)
+  value,
+  value * value AS square
+  FROM (
+    SELECT value FROM generate_series(1, 6)
+  ) subquery
 ```
-|num | square|
-|----|-------|
 |1 | 1|
+|--|--|
 |2 | 4|
 |3 | 9|
 |4 | 16|
 |5 | 25|
 |6 | 36|
-|(6 rows)|
-|Time: 0.468 ms|
 
-The SQL code is executed as a SQL command via the `psql` command. A default installation of postgresql should be suitable to run this code. Generally the following commands should get you started:
-
-```bash
-  # on Ubuntu
-  sudo apt-get install postgresql 
-  
-  # on OSX
-  brew install postgresql
-  
-  # setup a default database
-  createuser $(whoami)
-  createdb $(whoami)
-```
-
+The SQL code is executed in a sqlite3 in-memory database.
 
 ## Controlling the display mode
 
 The above examples use some default display mode to print the result. `omd` also allows you to override this. The following example runs git diff on a file in this repository, formatting the output in diff mode:
 
-    ```{@bash | diff}
+    ```{bash | diff}
     git diff cb6e2b0a~ cb6e2b0a
     ```
 
