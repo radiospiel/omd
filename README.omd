@@ -4,6 +4,11 @@ https://github.com/radiospiel/omd
 ```
 
 ```{@bash}
+if ! which figlet > /dev/null ; then
+  echo "Please install figlet via 'brew install figlet'" >&2
+  exit 1
+fi
+
 figlet "Oh My Doc!"
 ```
 
@@ -304,16 +309,4 @@ The result looks like this:
 
 ```{@bash | diff}
 git diff --unified=2 cb6e2b0a~ cb6e2b0a -- bin/omd
-```
-
-
-<!--BREAK-->
-
-## Hint
-
-When viewing the README.md file generated via omd in "Marked 2" you will notice that "Marked 2" replaces fenced code blocks with intendations with the last of those blocks in the input file. This seems to be an issue with "Marked 2". This should not affect the usefulness of the *omd* + *Marked 2* combination outside of this document though. 
-
-```
-Marked 2 has trouble with fenced code blocks with intendation.
-This document is rendered incorrectly in Marked 2.
 ```

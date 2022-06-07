@@ -173,7 +173,7 @@ The following block is being run through svgbob. The graph is then embedded as a
 
 The result looks like this:
 
-![svgbob](./README.md.data/97c66671cf6827b6f4b8d235b7b96b35.svg)
+![svgbob](./README.md.data/05ae8fa75507b859bd215aaa77deb58b.svg)
 
 
 ## Graphviz: the `{dot}` processing instruction
@@ -201,7 +201,7 @@ digraph finite_state_machine {
 	LR_1 -> LR_3 [ label = "S($start)" ];
 }
 ```
-![dot](./README.md.data/e5fe6234a5d360433079914af1e5d016.png)
+![dot](./README.md.data/a976f85fb45e59aa8900341566a4be20.png)
 
 ## mermaid: the `{mermaid}` processing instruction
 
@@ -219,7 +219,7 @@ The following block is being run through mermaidjs' command line to generate an 
         another task      : 24d
     ```
 
-![mermaid](./README.md.data/35f485d7f8315c1ab271dc43fa5cffe4.png)
+![mermaid](./README.md.data/ac08c0a89cabb7ea2146473f00aae309.png)
 
 ## Shell code: the `{bash}` processing instruction
 
@@ -235,10 +235,14 @@ The result looks like this:
 fortune all
 ```
 ```
-petribar:
-	Any sun-bleached prehistoric candy that has been sitting in
-	the window of a vending machine too long.
-		-- Rich Hall, "Sniglets"
+/*
+ * [...] Note that 120 sec is defined in the protocol as the maximum
+ * possible RTT.  I guess we'll have to use something other than TCP
+ * to talk to the University of Mars.
+ * PAWS allows us longer timeouts and large windows, so once implemented
+ * ftp to mars will work nicely.
+ */
+(from /usr/src/linux/net/inet/tcp.c, concerning RTT [retransmission timeout])
 ```
 
 ## SQL: the `{sql}` processing instruction
@@ -271,6 +275,7 @@ FROM
 |5 | 25|
 |6 | 36|
 |(6 rows)|
+|Time: 0.468 ms|
 
 The SQL code is executed as a SQL command via the `psql` command. A default installation of postgresql should be suitable to run this code. Generally the following commands should get you started:
 
@@ -323,16 +328,4 @@ index f5046a4..8f1ba96 100755
 +      logger.warn "processing an #{intro.inspect} block"
  
        Dir.mktmpdir do |tmpdir|
-```
-
-
-<!--BREAK-->
-
-## Hint
-
-When viewing the README.md file generated via omd in "Marked 2" you will notice that "Marked 2" replaces fenced code blocks with intendations with the last of those blocks in the input file. This seems to be an issue with "Marked 2". This should not affect the usefulness of the *omd* + *Marked 2* combination outside of this document though. 
-
-```
-Marked 2 has trouble with fenced code blocks with intendation.
-This document is rendered incorrectly in Marked 2.
 ```

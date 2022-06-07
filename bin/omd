@@ -136,7 +136,11 @@ end
 
 # -- helpers ------------------------------------------------------------------
 
-def File.write(path, body, permissions: nil)
+def File.write(path, body = nil, permissions: nil, &block)
+  if block
+    body = [body, yield].compact.join("\n")
+  end
+
   File.open(path, "w") do |io|
     io.write(body)
   end
@@ -340,15 +344,21 @@ module OMD
       processing_time = Benchmark.realtime do
         input = File.open src
 
-        # read file line by line. Extract and yield omd blocks
+        # read file line by line. Extract and yield omd blocks.
+        #
+        # omd blocks begin with three backticks, followed by omd arguments
+        # in curly braces.
         while (line = input.gets)
           unless line =~ /^```{\s*(.*)\s*}\s*$/
             writer.line(line)
             next
           end
 
+          # extract omd arguments.
           omd_args = Regexp.last_match(1)
-          # read until end of omd block
+          
+          # read until end of omd block. The lines read we'll read here
+          # will form the input of the omd processor.
           code_block = []
           while (line = input.gets)
             break if line.start_with?("```")
@@ -357,9 +367,9 @@ module OMD
           end
 
           code_block = code_block.join("")
-
           code_block = unintend(code_block)
 
+          # print code block. If the code block
           print_code_block(omd_args, code_block, writer: writer)
           
           writer.transaction(omd_args, code_block) do
@@ -397,11 +407,16 @@ module OMD
       sh! cmd, raise_on_error: false
     end
 
+    def which(binary)
+      sh!("type -p #{binary}")
+    rescue ShellError
+      nil
+    end
+
     def sh!(cmd, raise_on_error: true)
       OMD.logger.warn "Running #{cmd}"
       stdout_str, stderr_str, status = Open3.capture3(cmd)
 
-      # "Running #{cmd}"
       return stdout_str if status.exitstatus == 0
       return stdout_str if !raise_on_error
 
@@ -415,6 +430,23 @@ module OMD
   module Processors
     extend self
 
+    private
+
+    def requires_binary!(binary, installation)
+      return if H.which(binary)
+
+      STDERR.puts <<~MSG
+      This omd file requires a #{binary} installation. Try to run
+      
+      #{installation}
+      
+      to install it on your local machine.
+      MSG
+      exit 1
+     end
+     
+    public
+    
     def comment(intro, code_block, writer:); end
 
     def dot(filters, code_block, writer:)
@@ -447,11 +479,12 @@ module OMD
     end
 
     def mermaid(filters, code_block, writer:)
+      requires_binary! "mmdc", "brew install mermaid-cli"
       OMD.logger.warn "mermaid"
       File.write("omd.mmd", code_block)
-      OMD.logger.warn "wrote file mermaid"
+      OMD.logger.warn "wrote mermaid file"
       result = H.sh! "mmdc -i omd.mmd -o mermaid.png"
-      OMD.logger.warn "got result"
+      OMD.logger.warn "got mermaid result"
       writer.image "mermaid.png", alt: "mermaid"
     end
 
@@ -459,11 +492,11 @@ module OMD
       tmp_file = ".omd-#{$$}.sh"
       File.write tmp_file, <<~BASH, permissions: 0755
       #!/bin/bash
+      set -eu -o pipefail
       #{code_block}
       BASH
 
       result = H.sh! "./#{tmp_file}"
-      
       if filters.length == 1
         writer.code_block result, lang: filters.first
       else
@@ -485,18 +518,19 @@ module OMD
     def sql(filters, code_block, writer:)
       File.write("omd.sql", code_block)
 
-      success = H.sh! "psql -F'\t' --no-align -f omd.sql"
+      success = H.sh! "psql -F'\t' --quiet --no-align -f omd.sql"
+      OMD.logger.success success
       writer.table(success, separator: "\t")
     end
   end
 
-  def print_code_block(intro, code_block, writer:)
-    return if intro =~ /^@/
-    return if intro =~ /^comment/
+  def print_code_block(omd_args, code_block, writer:)
+    return if omd_args =~ /^@/
+    return if omd_args =~ /^comment/
 
-    lang = $1 if intro =~ /^@?(\S+)/
+    lang = $1 if omd_args =~ /^@?(\S+)/
 
-    # lines starting with "@" are to be hidden.
+    # lines starting with "@" will be hidden.
     code_block = code_block.gsub(/^@[^\n]*\n/, "")
 
     # remove leading and trailing empty lines.
@@ -520,6 +554,8 @@ module OMD
     end
   end
 
+  LANGS_IN_TMP_DIR = %w(bash)
+
   def process_code_block(intro, code_block, writer:)
     intro.gsub!(/^@\s*/, "")
     lang, *filters = intro.split(/\s*\|\s*/)
@@ -531,18 +567,17 @@ module OMD
 
     logger.warn "processing an #{intro.inspect} block"
 
-    run_in_tmp_dir = !%w(bash).include?(lang)
+    # Some commands are running inside a temp dir.
+    run_in_tmp_dir = !LANGS_IN_TMP_DIR.include?(lang)
 
     process_in_dir(tmpdir: run_in_tmp_dir) do
       code_block = code_block.gsub(/^@\s*/, "")
       Processors.send lang, filters, code_block, writer: writer
-    rescue ShellError
-      writer.error($!.to_s)
     end
   end
 end
 
 unless $loaded
   $loaded = true
-  Simple::CLI.run!(OMD::CLI, *ARGV)
+  Simple::CLI.run!(OMD::CLI) #, *ARGV)
 end
