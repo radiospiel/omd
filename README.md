@@ -134,8 +134,8 @@ The following block is compiling a C program and rendering both the source code 
           return n < 3 ? 1 : fib(n-1) + fib(n-2);
         }
     
-        int main(int argc, char** argv) {
-          int n = atoi(argv[1]);
+        int main() {
+          int n = 10;
           printf("Fibonacci number of %d is %d\n", n, fib(n));
         }
     ```
@@ -147,8 +147,8 @@ int fib(int n) {
   return n < 3 ? 1 : fib(n-1) + fib(n-2);
 }
 
-int main(int argc, char** argv) {
-  int n = atoi(argv[1]);
+int main() {
+  int n = 10;
   printf("Fibonacci number of %d is %d\n", n, fib(n));
 }
 ```
@@ -235,9 +235,9 @@ The result looks like this:
 fortune all
 ```
 ```
-Four fifths of the perjury in the world is expended on tombstones, women
-and competitors.
-		-- Lord Thomas Dewar
+Come, landlord, fill the flowing bowl until it does run over,
+Tonight we will all merry be -- tomorrow we'll get sober.
+		-- John Fletcher, "The Bloody Brother", II, 2
 ```
 
 ## SQL: the `{sql}` processing instruction
@@ -249,11 +249,8 @@ The following block is being executed as a SQL command:
       value,
       value * value AS square
       FROM (
-        SELECT
-          value
-        FROM
-          generate_series(1, 6)
-      ) sq
+        SELECT value FROM generate_series(1, 6)
+      ) subquery
     ```
 
 The result looks like this:

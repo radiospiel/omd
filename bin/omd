@@ -156,7 +156,7 @@ module OMD
     extend self
 
     def reset!
-      OMD.logger.success "reset source_version"
+      OMD.logger.debug "reset source_version"
       @source_version = nil
     end
 
@@ -172,7 +172,7 @@ module OMD
       return @source_version if @source_version
 
       @source_version = Digest::MD5.hexdigest(File.read(__FILE__))
-      OMD.logger.success "source_version", @source_version
+      OMD.logger.debug "source_version", @source_version
       @source_version
     end
   end
@@ -277,14 +277,14 @@ module OMD
       dest_file = File.join(@dir, "#{digest}#{File.extname(path)}")
       FileUtils.mkdir_p @dir
       FileUtils.cp(path, dest_file)
-      OMD.logger.warn "copy_file #{path} -> #{dest_file}"
+      OMD.logger.debug "copy_file #{path} -> #{dest_file}"
 
       File.join(File.basename(@dir), File.basename(dest_file))
     end
 
     def image(src, alt: nil)
-      OMD.logger.warn "image #{src.inspect}"
-      
+      OMD.logger.debug "image #{src.inspect}"
+
       dest_path = copy_file(src)
       line "![#{alt}](./#{dest_path})"
     end
@@ -335,6 +335,39 @@ module OMD
     end
   end
 
+  class FileReader
+    def self.open(file)
+      new file
+    end
+
+    def initialize(file)
+      @file = file
+      @fd = File.open(file)
+      @line = 0
+    end
+
+    def location
+      @relative_location ||= relative_location
+      "#{@relative_location}:#{@line}"
+    end
+
+    def gets
+      @line += 1
+      @fd.gets
+    end
+
+    private
+
+    def relative_location
+      wd = Dir.getwd
+      if @file.start_with?("#{wd}/")
+        @file[wd.length+1 .. -1]
+      else
+        @file
+      end
+    end
+  end
+
   # Process one or more input files, put results into dest
   def process(src, dest)
     return if File.exist?(dest) && File.mtime(src) < File.mtime(dest) && !OMD::SourceVersion.reloaded?
@@ -343,13 +376,13 @@ module OMD
 
     Writer.open(dest) do |writer|
       processing_time = Benchmark.realtime do
-        input = File.open src
+        file_reader = FileReader.open src
 
         # read file line by line. Extract and yield omd blocks.
         #
         # omd blocks begin with three backticks, followed by omd arguments
         # in curly braces.
-        while (line = input.gets)
+        while (line = file_reader.gets)
           unless line =~ /^```{\s*(.*)\s*}\s*$/
             writer.line(line)
             next
@@ -357,11 +390,11 @@ module OMD
 
           # extract omd arguments.
           omd_args = Regexp.last_match(1)
-          
+
           # read until end of omd block. The lines read we'll read here
           # will form the input of the omd processor.
           code_block = []
-          while (line = input.gets)
+          while (line = file_reader.gets)
             break if line.start_with?("```")
 
             code_block << line
@@ -372,9 +405,9 @@ module OMD
 
           # print code block. If the code block
           print_code_block(omd_args, code_block, writer: writer)
-          
+
           writer.transaction(omd_args, code_block) do
-            process_code_block(omd_args, code_block, writer: writer)
+            process_code_block(file_reader, omd_args, code_block, writer: writer)
           end
         end
       end
@@ -409,19 +442,37 @@ module OMD
     end
 
     def which(binary)
-      sh!("type -p #{binary}")
+      sh!("type -p #{binary}", quiet: true)
     rescue ShellError
       nil
     end
 
-    def sh!(cmd, raise_on_error: true)
-      OMD.logger.warn "Running #{cmd}"
+    def which!(binary, hint = nil)
+      return if which(binary)
+
+      STDERR.puts "This omd file requires a #{binary} installation."
+
+      if hint
+        STDERR.puts <<~MSG
+        Try to run
+
+        #{installation}
+
+        to install it on your local machine.
+        MSG
+      end
+
+      exit 1
+    end
+
+    def sh!(cmd, raise_on_error: true, quiet: false)
+      OMD.logger.debug "Running '#{cmd}'" unless quiet
       stdout_str, stderr_str, status = Open3.capture3(cmd)
 
       return stdout_str if status.exitstatus == 0
       return stdout_str if !raise_on_error
 
-      OMD.logger.warn "Running #{cmd} -> #{status.exitstatus}"
+      OMD.logger.warn "Running #{cmd} failed w/exit status #{status.exitstatus}"
       OMD.logger.info stderr_str
 
       raise ShellError, stderr_str if raise_on_error
@@ -431,23 +482,6 @@ module OMD
   module Processors
     extend self
 
-    private
-
-    def which!(binary, installation)
-      return if H.which(binary)
-
-      STDERR.puts <<~MSG
-      This omd file requires a #{binary} installation. Try to run
-      
-      #{installation}
-      
-      to install it on your local machine.
-      MSG
-      exit 1
-     end
-     
-    public
-    
     def comment(intro, code_block, writer:); end
 
     def dot(filters, code_block, writer:)
@@ -480,7 +514,7 @@ module OMD
     end
 
     def mermaid(filters, code_block, writer:)
-      which! "mmdc", "brew install mermaid-cli"
+      H.which! "mmdc", "brew install mermaid-cli"
 
       File.write("omd.mmd", code_block)
       result = H.sh! "mmdc -i omd.mmd -o mermaid.png"
@@ -503,23 +537,24 @@ module OMD
       end
     ensure
       FileUtils.rm_f tmp_file
-    end    
+    end
 
     def cc(filters, code_block, writer:)
+      H.which! "cc"
+
       File.write("omd.cc", code_block)
 
       H.sh! "cc -Wall omd.cc"
 
-      result = H.sh! "./a.out 10"
+      result = H.sh! "./a.out"
       writer.code_block result
     end
 
     def sql(filters, code_block, writer:)
-      which! "sqlite3", "brew install sqlite3"
+      H.which! "sqlite3", "brew install sqlite3"
 
       File.write("omd.sql", code_block)
       success = H.sh! "sqlite3 -noheader -separator $'\t' < omd.sql"
-      OMD.logger.success success
       writer.table(success, separator: "\t")
     end
   end
@@ -543,7 +578,7 @@ module OMD
 
     writer.code_block(code_block, lang: lang)
   end
-  
+
   def process_in_dir(tmpdir:)
     return yield unless tmpdir
 
@@ -559,16 +594,16 @@ module OMD
   # some local resources.
   LANGS_NOT_RUNNING_IN_TMP_DIR = %w(bash)
 
-  def process_code_block(intro, code_block, writer:)
+  def process_code_block(file_reader, intro, code_block, writer:)
     intro.gsub!(/^@\s*/, "")
     lang, *filters = intro.split(/\s*\|\s*/)
 
     if !lang || !Processors.respond_to?(lang)
-      writer.error "omd: Unsupported omd processor #{lang.inspect}"
+      writer.error "#{file_reader.location}: Unsupported omd processor #{lang.inspect}"
       return
     end
 
-    logger.warn "processing an #{intro.inspect} block"
+    logger.warn "#{file_reader.location}: processing #{intro.inspect} block"
 
     # Some commands are running inside a temp dir.
     run_in_tmp_dir = !LANGS_NOT_RUNNING_IN_TMP_DIR.include?(lang)
