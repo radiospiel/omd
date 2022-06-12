@@ -22,6 +22,24 @@ require "open3"
 require "digest"
 require "pstore"
 
+class File
+  def self.path_relative_to(path, dir)
+    if path.start_with?("#{dir}/")
+      return path[dir.length+1 .. -1]
+    end
+  end
+
+  def self.shortpath(path)
+    if (shortpath = path_relative_to(path, Dir.getwd))
+      shortpath
+    elsif (shortpath = path_relative_to(path, ENV["HOME"]))
+      "~/" + shortpath
+    else
+      path
+    end
+  end
+end
+
 module OMD
   extend self
 
@@ -33,104 +51,102 @@ end
 module OMD::CLI
   include ::Simple::CLI
 
-  private
-
-  def check_paths(src, dest, clean:)
-    dest ||= src.gsub(/\.[^\.]*$/, "") + ".md"
-
-    raise "#{src} and #{dest} files must differ" unless src != dest
-    raise "#{src}: missing or not a file" unless File.exist?(src) && File.file?(src)
-    raise "#{dest}: cannot be a directory" if File.exist?(dest) && File.directory?(dest)
-
-    src = File.expand_path(src)
-    dest = File.expand_path(dest)
-
-    raise "input and output file must be in the same directory" if File.dirname(src) != File.dirname(dest)
-
-    OMD.prepare_destination(dest, clean: clean)
-    [src, dest]
-  end
-
-  public
-
   # Process src file, and process into a destination file
   #
   # Flags:
   #
-  #   --output=<file>     The output file, defaults to the source file with a ".md" file extension
   #   --display           Open the "Marked 2" markdown preview
-  #   --clean             Clear put cache
+  #   --clean             Clear cache before running
   #
   # Example:
   #
-  # To process the src/README.omd file and generate the src/README.md file, using the cache
-  # for results from previous runs:
+  # To process "doc/README.omd" (generating "doc/README.md"), using
+  # cached results from previous runs:
   #
-  #     omd process src/README.omd
+  #     omd process doc/README.omd
   #
-  # To completely process the src/README.omd file, ignoring everything in the cache, generate
-  # the src/result.md file, and open the "Marked 2" markdown viewer:
+  # To process all files in the "doc" directory, ignoring previously
+  # cached results, and open the "Marked 2" markdown viewer:
   #
-  #     omd process src/README.omd --output=src/result.md --clean --display
+  #     omd process doc --clean --display
   #
-  def process(src, output: nil, clean: false, display: false)
-    src, dest = check_paths src, output, clean: clean
+  def process(src = ".", clean: false, display: false)
+    file_to_display = nil
 
-    OMD.process(src, dest)
-    system "open", "-a", "Marked 2", dest if display
+    source_files_newest_first(src).each do |path|
+      dest = OMD.process(src, clean: clean)
+      file_to_display ||= dest
+    end
+
+    if display && file_to_display
+      system "open", "-a", "Marked 2", file_to_display
+    end
   end
 
-  # Watches a source file, rebuilding the destination target whenever necessary
+  # Watches one or more source files, rebuilding results whenever sources change
   #
   # Flags:
   #
-  #   --output=<file>     The output file, defaults to the source file with a ".md" file extension
   #   --display           Open the "Marked 2" markdown preview
-  #   --clean             Clear put cache
+  #   --clean             Clear cache before processing
   #
   # Example:
   #
-  # To process the src/README.omd file and generate the src/README.md file, using the cache
-  # for results from previous runs:
+  # To process the doc/README.omd file (generating doc/README.md) run:
   #
-  #     omd process src/README.omd
+  #     omd watch doc/README.omd
   #
-  # To completely process the src/README.omd file, ignoring everything in the cache, generate
-  # the src/result.md file, and open the "Marked 2" markdown viewer:
+  # This will use cached results from previous runs. To ignore everything
+  # in the cache, use the --clean flag, like so:
   #
-  #     omd process src/README.omd --output=src/result.md --clean --display
+  #     omd watch doc/README.omd --clean --display
   #
-  def watch(src, output: nil, clean: false, display: false)
-    src, dest = check_paths src, output, clean: clean
-
+  # To watch an entire directory run
+  #
+  #     omd watch path/to/dir
+  #
+  def watch(src, clean: false, display: false)
     # process once (so that we are up to date)
-    process src, output: dest, clean: false, display: display
+    process src, clean: false, display: display
 
     # start watching
     require "rb-fsevent"
     fsevent = FSEvent.new
-    fsevent.watch [__dir__, File.dirname(src)], latency: 0.1 do |dirs, event_meta|
-      next unless detected_change?(dirs, event_meta, src_dir: File.dirname(src))
 
-      OMD.process(src, dest)
+    src_dir = File.directory?(src) ? src : File.dirname(src)
+
+    fsevent.watch [__dir__, src_dir], latency: 0.1 do |changed_dirs, event_meta|
+      logger.debug "Detected change in " +
+        changed_dirs.uniq.map { |p| File.shortpath(p) }.join(", ")
+
+      # We are watching omd's source dir (in __dir__): if there is a change
+      # here we reload the script. This helps during development, and otherwise
+      # doesn't hurt (since omd's installation target directory, typically
+      # /usr/local/bin, will rarely see changes.
+      if changed_dirs.any? { |dir| dir.start_with?(__dir__) }
+        logger.info "#{File.shortpath(__FILE__)}: reloading omd source file"
+        load __FILE__
+        next
+      end
+
+      # Otherwise the change must have happened inside the src directory.
+      # We are going to reprocess the most recently changed one.
+      changed_file = source_files_newest_first(src).first
+      process(changed_file) if changed_file
     end
     fsevent.run
   end
 
   private
 
-  def detected_change?(dirs, _event_meta, src_dir:)
-    logger.debug "Detected change in", dirs.join(",")
-
-    if dirs.any? { |dir| dir.start_with?(__dir__) }
-      logger.info "reloading", __FILE__
-      load __FILE__
-      return true
-    end
-
-    src_dir = File.expand_path(src_dir)
-    if dirs.any? { |dir| dir.start_with?(src_dir) }
-      return true
+  def source_files_newest_first(src)
+    if File.directory?(src)
+      paths = Dir.glob("#{src}/*.omd")
+      paths = paths.sort_by { |path| -File.stat(path).mtime.to_i }
+    elsif File.file?(src)
+      [src]
+    else
+      raise "#{src}: must be a file or a directory."
     end
   end
 end
@@ -201,11 +217,6 @@ module OMD
   def dest_data_dir(dest)
     dirname, basename = File.dirname(dest), File.basename(dest)
     File.join(dirname, "#{basename}.data")
-  end
-
-  def prepare_destination(dest, clean:)
-    FileUtils.rm_rf(dest_data_dir(dest)) if clean
-    FileUtils.mkdir_p(dest_data_dir(dest))
   end
 
   class Writer
@@ -347,30 +358,46 @@ module OMD
     end
 
     def location
-      @relative_location ||= relative_location
-      "#{@relative_location}:#{@line}"
+      @shortpath ||= File.shortpath(@file)
+      "#{@shortpath}:#{@line}"
     end
 
     def gets
       @line += 1
       @fd.gets
     end
-
-    private
-
-    def relative_location
-      wd = Dir.getwd
-      if @file.start_with?("#{wd}/")
-        @file[wd.length+1 .. -1]
-      else
-        @file
-      end
-    end
   end
 
+  private
+
+  def check_paths(src)
+    dest = src.gsub(/\.[^\.]*$/, "") + ".md"
+
+    raise "#{src} and #{dest} files must differ" unless src != dest
+    raise "#{src}: missing or not a file" unless File.exist?(src) && File.file?(src)
+    raise "#{dest}: cannot be a directory" if File.exist?(dest) && File.directory?(dest)
+
+    src = File.expand_path(src)
+    dest = File.expand_path(dest)
+
+    raise "input and output file must be in the same directory" if File.dirname(src) != File.dirname(dest)
+
+    [src, dest]
+  end
+
+  def prepare_destination(dest, clean:)
+    FileUtils.rm_rf(dest_data_dir(dest)) if clean
+    FileUtils.mkdir_p(dest_data_dir(dest))
+  end
+
+  public
+
   # Process one or more input files, put results into dest
-  def process(src, dest)
+  def process(src, clean:)
+    src, dest = check_paths(src)
     return if File.exist?(dest) && File.mtime(src) < File.mtime(dest) && !OMD::SourceVersion.reloaded?
+
+    prepare_destination(dest, clean: clean)
 
     processing_time = nil
 
@@ -413,7 +440,14 @@ module OMD
       end
     end
 
-    logger.info "generated #{dest} from #{src}: #{"%.3f secs" % processing_time}"
+    logger.info "#{File.shortpath src}: generated #{File.shortpath dest}: #{"%.3f secs" % processing_time}"
+  rescue
+    logger.error "#{File.shortpath src}: could not generate #{File.shortpath dest}"
+    raise
+  end
+
+  def shortpath(x)
+    {}.extend(OMD::CLI).send(:shortpath, x)
   end
 
   def unintend(code_block)
@@ -592,7 +626,9 @@ module OMD
   # most languages are running inside a temp dir. bash isn't -
   # because we assume that a bash script might want to access
   # some local resources.
-  LANGS_NOT_RUNNING_IN_TMP_DIR = %w(bash)
+  unless defined?(LANGS_NOT_RUNNING_IN_TMP_DIR)
+    LANGS_NOT_RUNNING_IN_TMP_DIR = %w(bash)
+  end
 
   def process_code_block(file_reader, intro, code_block, writer:)
     intro.gsub!(/^@\s*/, "")

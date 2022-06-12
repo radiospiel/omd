@@ -10,30 +10,45 @@
 
 # Oh My Doc!
 
-"Oh My Doc" –– or, short, `omd`, is a preprocessor which lets an author write markdown containing code. When preprocessing the document `omd` executes this code and embeds the results into the generated markdown output. For example, the logo above is generated via OMD's shell integration and the figlet command. Still, *omd's* input still looks like and very much is markdown.
+"Oh My Doc" –– or, short, `omd`, is a preprocessor which lets an author write markdown containing code snippets. When generating markdown `omd` executes these code snippets and puts the results into the generated output in a markdown-compatible way. This lets authors combine written content and dynamically generated data *omd's* input still looks like and very much is markdown.
 
-The capability to embed code and its output should help you write about and discuss code or data. One could see `omd` as a server-less, lightweight, alternative to a Jypiter Notebook. 
+For example, the logo above is generated via the figlet(1) command. This is achieved by the following input section:
 
-Currently *omd* supports the following input:
+    ```{@bash}
+    if ! which figlet > /dev/null ; then
+      echo "Please install figlet via 'brew install figlet'" >&2
+      exit 1
+    fi
+    
+    figlet "Oh My Doc!"
+    ```
+
+Currently *omd* is able to handle the following types of code output:
+
+- plaintext
+- CSV tables
+- jpg- and png-images
+
+Currently *omd* supports the following types of code:
 
 - Shell commands
-- C language programs: they are compiled and executed; their output is embedded verbatim in the output;
-- Ruby programs: they are executed; their output is embedded verbatim in the output;
+- C language programs: they are compiled and executed, and their output is embedded verbatim in the output;
+- Ruby programs: they are executed, and their output is embedded verbatim in the output;
 - Graphviz dot scripts: they are rendered into images that then are embedded into the output;
+- svgbob diagrams: they are executed via svgbob (TODO: add link) and embedded as a SVG image.
 - SQL commands: they are executed via a psql session; the output is rendered into a table;
-- svgbob diagrams: they are executed via svgbob and embedded as a SVG image.
 
-More details on omd processing instructions can be found below.
+Before we jump into explaining how one can use these modi it is time for a 
 
-## Security warning
+## SECURITY ANNOUNCEMENT
 
 Since the embedded scripts's functionality is by intention not crippled, a document, when run through *omd*, could be harmful. **You should therefore never open a OMD file that you didn't write yourself or inspected properly.**
 
 You have been warned.
 
-## Installation
+## Installation & usage
 
-1. Have a recent ruby version
+1. Have a recent ruby version (we are currently using ruby 2.7.2)
 2. Make sure bundler is installed: `gem install bundler`
 3. Copy the script `bin/omd` into a location in your path.
 
@@ -235,9 +250,8 @@ The result looks like this:
 fortune all
 ```
 ```
-Come, landlord, fill the flowing bowl until it does run over,
-Tonight we will all merry be -- tomorrow we'll get sober.
-		-- John Fletcher, "The Bloody Brother", II, 2
+A bore is someone who persists in holding his own views after we have
+enlightened him with ours.
 ```
 
 ## SQL: the `{sql}` processing instruction
