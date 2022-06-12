@@ -15,7 +15,7 @@ watch:
 	bin/omd watch README.omd --clean --display
 
 format:
-	rubocop -a bin/omd
+	rubocop -a bin lib
 
 install: dependencies
 	cp bin/omd /usr/local/bin

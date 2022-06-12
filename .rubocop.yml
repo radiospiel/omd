@@ -2,16 +2,17 @@ AllCops:
   TargetRubyVersion: 2.5
   Exclude:
     - ./*.gemspec
+  NewCops: enable
 
 Metrics/PerceivedComplexity:
   Enabled: false
-  
+
 Metrics/MethodLength:
   Enabled: false
-  
+
 Metrics/CyclomaticComplexity:
   Enabled: false
-  
+
 Metrics/AbcSize:
   Enabled: false
 
@@ -23,13 +24,13 @@ Style/ClassAndModuleChildren:
 
 Style/FormatString:
   Enabled: false
-  
+
 Style/PerlBackrefs:
   Enabled: false
-  
+
 Style/GlobalVars:
   Enabled: false
-  
+
 Style/SpecialGlobalVars:
   Enabled: false
 
@@ -56,11 +57,21 @@ Style/IfUnlessModifier:
 
 Style/SafeNavigation:
   Enabled: false
-  
+
 Lint/MissingCopEnableDirective:
   Enabled: false
 
-Performance/RegexpMatch:
+Layout/MultilineMethodCallIndentation:
   Enabled: false
 
+Style/WhileUntilModifier:
+  Enabled: false
 
+Style/ParallelAssignment:
+  Enabled: false
+
+Style/GuardClause:
+  Enabled: false
+
+Style/RedundantAssignment:
+  Enabled: false
