@@ -61,7 +61,6 @@ module OMD::CLI
     # process once (so that we are up to date)
     process src, clean: clean, display: display
 
-
     # We are watching omd's source dir and the directory of the omd
     # source file. Doing this helps during development, and otherwise
     # doesn't hurt (since omd's installation target directory will
@@ -70,7 +69,7 @@ module OMD::CLI
     dirs_to_watch << (File.directory?(src) ? src : File.dirname(src))
     dirs_to_watch << OMD.root_dir
 
-    while true do
+    loop do
       result_mode, result_path = OMD::Watcher.watch dirs_to_watch, latency: 0.1 do |changed_dirs|
         if changed_dirs.any? { |dir| dir.start_with?(OMD.root_dir) }
           [:changed_source, nil]

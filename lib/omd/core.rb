@@ -53,32 +53,17 @@ module OMD::Core
         #
         # omd blocks begin with three backticks, followed by omd arguments
         # in curly braces.
-        while (line = file_reader.gets)
-          unless line =~ /^```{\s*(.*)\s*}\s*$/
-            writer.line(line)
-            next
-          end
+        while (token = file_reader.read_next_token)
+          case token
+          when FileReader::CodeBlock
+            # print code block. If the code block
+            print_code_block(token, writer: writer)
 
-          # extract omd arguments.
-          omd_args = Regexp.last_match(1)
-
-          # read until end of omd block. The lines read we'll read here
-          # will form the input of the omd processor.
-          code_block = []
-          while (line = file_reader.gets)
-            break if line.start_with?("```")
-
-            code_block << line
-          end
-
-          code_block = code_block.join
-          code_block = unintend(code_block)
-
-          # print code block. If the code block
-          print_code_block(omd_args, code_block, writer: writer)
-
-          writer.transaction(omd_args, code_block) do
-            process_code_block(file_reader, omd_args, code_block, writer: writer)
+            writer.transaction(token) do
+              process_code_block(file_reader, token, writer: writer)
+            end
+          when FileReader::PlainInputLine
+            writer.line(token)
           end
         end
       end
@@ -90,42 +75,25 @@ module OMD::Core
     raise
   end
 
-  def unintend(code_block)
-    code_block = code_block
-      .split("\n")
-
-    number_of_leading_spaces = code_block
-      .grep_v(/^\s*$/)
-      .map { |line| line =~ /^( *)/ && $1 }
-      .compact
-      .map(&:length)
-      .min
-
-    code_block
-      .map { |line| line =~ /^ / ? line[number_of_leading_spaces..-1] : line }
-      .map { |line| "#{line}\n" }.join
-  end
-
   class ShellError < RuntimeError; end
 
-  def print_code_block(omd_args, code_block, writer:)
+  def print_code_block(code_block, writer:)
+    omd_args = code_block.args
+
     return if omd_args =~ /^@/
     return if omd_args =~ /^comment/
 
     lang = $1 if omd_args =~ /^@?(\S+)/
 
     # lines starting with "@" will be hidden.
-    code_block = code_block.gsub(/^@[^\n]*\n/, "")
+    printable_code_block = code_block.body.gsub(/^@[^\n]*\n/, "")
 
     # remove leading and trailing empty lines.
-    while code_block.start_with?("\n")
-      code_block = code_block[1..-1]
-    end
-    while code_block.end_with?("\n")
-      code_block = code_block[0...-1]
-    end
+    printable_code_block = printable_code_block
+      .gsub(/\A\n+/, "")
+      .gsub(/\n+\z/, "")
 
-    writer.code_block(code_block, lang: lang)
+    writer.code_block(printable_code_block, lang: lang)
   end
 
   def process_in_dir(run_in_tmp_dir:, &block)
@@ -143,7 +111,8 @@ module OMD::Core
     LANGS_NOT_RUNNING_IN_TMP_DIR = %w[bash].freeze
   end
 
-  def process_code_block(file_reader, intro, code_block, writer:)
+  def process_code_block(file_reader, code_block, writer:)
+    intro = code_block.args
     intro.gsub!(/^@\s*/, "")
     lang, *filters = intro.split(/\s*\|\s*/)
 
@@ -158,8 +127,8 @@ module OMD::Core
     run_in_tmp_dir = !LANGS_NOT_RUNNING_IN_TMP_DIR.include?(lang)
 
     process_in_dir(run_in_tmp_dir: run_in_tmp_dir) do
-      code_block = code_block.gsub(/^@\s*/, "")
-      OMD::Processors.send lang, filters, code_block, writer: writer
+      code = code_block.body.gsub(/^@\s*/, "")
+      OMD::Processors.send lang, filters, code, writer: writer
     end
   end
 end
