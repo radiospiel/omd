@@ -70,24 +70,21 @@ module OMD::CLI
     dirs_to_watch << OMD.root_dir
 
     loop do
-      result_mode, result_path = OMD::Watcher.watch dirs_to_watch, latency: 0.1 do |changed_dirs|
+      watched = OMD::Watcher.watch dirs_to_watch, latency: 0.1 do |changed_dirs|
         if changed_dirs.any? { |dir| dir.start_with?(OMD.root_dir) }
-          [:changed_source, nil]
+          :source_changed
         elsif (changed_file = omd_files_newest_first(src).first)
-          [:changed_omd_file, changed_file]
+          process changed_file
+          nil
         end
       end
 
-      case result_mode
-      when :changed_source
-        OMD::Loader.reload!
-        process src
-      when :changed_omd_file
-        process result_path
-      when nil
-        # This happens on signals, e.g. SIGTERM
-        break
-      end
+      # Abort on SIGTERM et.al.
+      break if watched.nil?
+
+      # reload OMD
+      OMD::Loader.reload!
+      process src
     end
   end
 

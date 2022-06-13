@@ -4,8 +4,8 @@ class OMD::Core::FileReader
   end
 
   class CodeBlock
-    START_REGEXP = /^```{\s*(.*)\s*}\s*$/.freeze
-    END_REGEXP = /^```\s*$/.freeze
+    START_REGEXP = /^```{\s*(.*)\s*}\s*$/.freeze unless defined?(START_REGEXP)
+    END_REGEXP = /^```\s*$/.freeze unless defined?(END_REGEXP)
 
     attr_reader :args, :body, :code, :embedded_files
 
@@ -86,7 +86,7 @@ class OMD::Core::FileReader
     end
 
     private_class_method def self.join_lines(lines)
-      lines.join("\n") + "\n"
+      lines.join("\n") + "\n"    # rubocop:disable Style/StringConcatenation
     end
 
     private_class_method def self.unintend(lines)
@@ -99,7 +99,6 @@ class OMD::Core::FileReader
 
       lines
         .map { |line| line =~ /^ / ? line[number_of_leading_spaces..-1] : line }
-        .map { |line| line.to_s }
     end
   end
 

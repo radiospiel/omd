@@ -78,3 +78,6 @@ Style/RedundantAssignment:
 
 Style/StderrPuts:
   Enabled: false
+
+Style/GlobalStdStream:
+  Enabled: false
