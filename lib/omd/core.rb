@@ -6,7 +6,7 @@ require_relative "core/file_reader"
 
 module OMD::Core
   extend self
-    
+
   def dest_data_dir(dest)
     dirname, basename = File.dirname(dest), File.basename(dest)
     File.join(dirname, "#{basename}.data")
@@ -39,9 +39,9 @@ module OMD::Core
   # Process one or more input files, put results into dest
   def process(src, clean:)
     src, dest = check_paths(src)
-    return if File.exist?(dest) && File.mtime(src) < File.mtime(dest) && !OMD::SourceVersion.reloaded?
-
     prepare_destination(dest, clean: clean)
+
+    return if File.exist?(dest) && File.mtime(src) < File.mtime(dest) && OMD::Loader.mtime < File.mtime(dest)
 
     processing_time = nil
 
@@ -89,7 +89,7 @@ module OMD::Core
     OMD.logger.error "#{File.shortpath src}: could not generate #{File.shortpath dest}"
     raise
   end
-  
+
   def unintend(code_block)
     code_block = code_block
       .split("\n")

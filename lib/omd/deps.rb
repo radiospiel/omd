@@ -2,7 +2,7 @@ require "bundler/inline"
 
 gemfile do
   source "https://rubygems.org"
-  gem "rb-fsevent", require: false
+  gem "rb-fsevent", "~> 0.11", ">= 0.11.1", require: false
   gem "simple-cli", "~> 0.4", require: false
 end
 

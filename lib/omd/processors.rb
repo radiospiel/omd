@@ -1,7 +1,7 @@
 module OMD::Processors
   extend self
 
-  H = OMD::H
+  H = OMD::H unless defined?(H)
 
   def comment(intro, code_block, writer:); end
 

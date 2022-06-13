@@ -25,7 +25,7 @@ module OMD::CLI
   def process(src = ".", clean: false, display: false)
     file_to_display = nil
 
-    source_files_newest_first(src).each do |path|
+    omd_files_newest_first(src).each do |path|
       dest = OMD::Core.process(path, clean: clean)
       file_to_display ||= dest
     end
@@ -61,36 +61,40 @@ module OMD::CLI
     # process once (so that we are up to date)
     process src, clean: clean, display: display
 
-    # start watching
-    require "rb-fsevent"
-    fsevent = FSEvent.new
 
-    src_dir = File.directory?(src) ? src : File.dirname(src)
+    # We are watching omd's source dir and the directory of the omd
+    # source file. Doing this helps during development, and otherwise
+    # doesn't hurt (since omd's installation target directory will
+    # rarely see changes.
+    dirs_to_watch = []
+    dirs_to_watch << (File.directory?(src) ? src : File.dirname(src))
+    dirs_to_watch << OMD.root_dir
 
-    fsevent.watch [__dir__, src_dir], latency: 0.1 do |changed_dirs, _event_meta|
-      changed_dirs = changed_dirs.uniq
-
-      # We are watching omd's source dir (in __dir__): if there is a change
-      # here we reload the script. This helps during development, and otherwise
-      # doesn't hurt (since omd's installation target directory, typically
-      # /usr/local/bin, will rarely see changes.
-      if changed_dirs.any? { |dir| dir.start_with?(__dir__) }
-        logger.info "#{File.shortpath(__FILE__)}: reloading omd source file"
-        load __FILE__
-        next
+    while true do
+      result_mode, result_path = OMD::Watcher.watch dirs_to_watch, latency: 0.1 do |changed_dirs|
+        if changed_dirs.any? { |dir| dir.start_with?(OMD.root_dir) }
+          [:changed_source, nil]
+        elsif (changed_file = omd_files_newest_first(src).first)
+          [:changed_omd_file, changed_file]
+        end
       end
 
-      # Otherwise the change must have happened inside the src directory.
-      # We are going to reprocess the most recently changed one.
-      changed_file = source_files_newest_first(src).first
-      process(changed_file) if changed_file
+      case result_mode
+      when :changed_source
+        OMD::Loader.reload!
+        process src
+      when :changed_omd_file
+        process result_path
+      when nil
+        # This happens on signals, e.g. SIGTERM
+        break
+      end
     end
-    fsevent.run
   end
 
   private
 
-  def source_files_newest_first(src)
+  def omd_files_newest_first(src)
     if File.directory?(src)
       paths = Dir.glob("#{src}/*.omd")
       paths = paths.sort_by { |path| -File.stat(path).mtime.to_i }
