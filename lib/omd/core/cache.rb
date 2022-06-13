@@ -4,19 +4,13 @@ class OMD::Core::Cache
   def initialize(dir)
     @store = PStore.new(File.join(dir, ".omd.pstore"))
     @store.ultra_safe = true
-
-    roots = @store.transaction do
-      @store.roots
-    end
   end
 
   def cached(*keys)
     key = calculate_key(*keys)
 
     @store.transaction do
-      @store[key] ||= begin
-        yield
-      end
+      @store[key] ||= yield
     end
   end
 

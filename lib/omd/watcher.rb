@@ -9,7 +9,7 @@ module OMD::Watcher
     fsevent.watch dirs, options do |changed_dirs, _event_meta|
       changed_dirs = changed_dirs.uniq
       result = yield changed_dirs
-      if result != nil
+      unless result.nil?
         fsevent.stop
       end
     end

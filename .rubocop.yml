@@ -43,7 +43,7 @@ Style/NumericPredicate:
 Style/Documentation:
   Enabled: false
 
-Metrics/LineLength:
+Layout/LineLength:
   Max: 140
 
 Style/StringLiteralsInInterpolation:

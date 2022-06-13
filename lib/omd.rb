@@ -1,5 +1,3 @@
-# rubocop:disable Metrics/ModuleLength
-
 module OMD
   extend self
 

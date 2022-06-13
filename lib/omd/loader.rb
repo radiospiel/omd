@@ -1,3 +1,5 @@
+# rubocop:disable Style/ClassVars
+
 module OMD::Loader
   extend self
 
