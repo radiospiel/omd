@@ -11,7 +11,7 @@ module OMD::Loader
     end
   rescue SyntaxError
     OMD.logger.error "Failure to reload OMD source file. See info below:"
-    STDERR.puts "#{$!}"
+    STDERR.puts $!.to_s
   end
 
   def source_version

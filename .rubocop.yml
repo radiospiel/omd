@@ -75,3 +75,6 @@ Style/GuardClause:
 
 Style/RedundantAssignment:
   Enabled: false
+
+Style/StderrPuts:
+  Enabled: false

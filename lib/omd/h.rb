@@ -1,6 +1,8 @@
 module OMD::H
   extend self
 
+  class ShellError < RuntimeError; end
+
   def sh(cmd)
     sh! cmd, raise_on_error: false
   end

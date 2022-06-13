@@ -7,35 +7,85 @@ class OMD::Core::FileReader
     START_REGEXP = /^```{\s*(.*)\s*}\s*$/.freeze
     END_REGEXP = /^```\s*$/.freeze
 
-    attr_reader :args, :body
+    attr_reader :args, :body, :code, :embedded_files
 
-    def initialize(args, body)
+    def initialize(args, body, code, embedded_files)
       @args = args
       @body = body
+      @code = code
+      @embedded_files = embedded_files
     end
 
     def self.read(file_reader)
-      line = file_reader.read_line
-      expect! line => START_REGEXP
-      line =~ START_REGEXP
+      # The first line contains the code block opening, in the form
+      # "```{ some omd comment }". The following lines are body lines;
+      # these are potentially separated by embedded file lines.
+      #
+      # An embedded file starts with an opening (--- filename.txt), followed
+      # by the actual file data.
 
-      # read a CodeBlock. The current line contains the code block opening,
-      # in the form "```{ some omd comment }"
+      # verify opening line
+      opening_line = file_reader.read_line
+      expect! opening_line => START_REGEXP
+
+      # extract args
+      opening_line =~ START_REGEXP
       args = $1
 
-      # read block, until we encounter a code block ending line.
+      # read the entire body
+      lines = read_body_lines(file_reader)
+
+      # extract embedded files and code part of the body.
+      code, embedded_files = extract_code_and_embedded_files(lines)
+
+      # build CodeBlock
+      new(args, join_lines(lines), code, embedded_files)
+    end
+
+    # read lines from the file_reader, until we encounter a code block ending line.
+    private_class_method def self.read_body_lines(file_reader)
       lines = []
 
       while (line = file_reader.read_line) && line !~ END_REGEXP
         lines << line
       end
 
+      # we have either a line matching END_REGEXP, or nil (i.e. end-of-file)
       raise "Open code block input" unless line
 
-      new(args, unintend(lines))
+      unintend(lines)
     end
 
-    def self.unintend(lines)
+    # run through the list of lines, separated by "--- filename" lines.
+    # extract those into a hash of embedded_files.
+    private_class_method def self.extract_code_and_embedded_files(body)
+      current_file = :code
+      embedded_files = {
+        current_file => []
+      }
+
+      body.each do |line|
+        if line =~ /^---\s+(.*)\s*$/
+          current_file = $1
+          embedded_files[current_file] = []
+        else
+          embedded_files[current_file] << line
+        end
+      end
+
+      code = embedded_files.delete(:code)
+      code = join_lines(code)
+
+      embedded_files = embedded_files.transform_values { |lines| join_lines(lines) }
+
+      [code, embedded_files]
+    end
+
+    private_class_method def self.join_lines(lines)
+      lines.join("\n") + "\n"
+    end
+
+    private_class_method def self.unintend(lines)
       number_of_leading_spaces = lines
         .grep_v(/^\s*$/)
         .map { |line| line =~ /^( *)/ && $1 }
@@ -45,8 +95,7 @@ class OMD::Core::FileReader
 
       lines
         .map { |line| line =~ /^ / ? line[number_of_leading_spaces..-1] : line }
-        .map { |line| "#{line}\n" }
-        .join
+        .map { |line| line.to_s }
     end
   end
 

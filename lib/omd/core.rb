@@ -75,8 +75,6 @@ module OMD::Core
     raise
   end
 
-  class ShellError < RuntimeError; end
-
   def print_code_block(code_block, writer:)
     omd_args = code_block.args
 
@@ -127,7 +125,12 @@ module OMD::Core
     run_in_tmp_dir = !LANGS_NOT_RUNNING_IN_TMP_DIR.include?(lang)
 
     process_in_dir(run_in_tmp_dir: run_in_tmp_dir) do
-      code = code_block.body.gsub(/^@\s*/, "")
+      # reconstitute embedded files
+      code_block.embedded_files.each do |file, data|
+        File.write file, data
+      end
+
+      code = code_block.code.gsub(/^@\s*/, "")
       OMD::Processors.send lang, filters, code, writer: writer
     end
   end
