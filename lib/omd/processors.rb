@@ -1,6 +1,8 @@
 module OMD::Processors
   extend self
 
+  H = OMD::H
+
   def comment(intro, code_block, writer:); end
 
   def dot(_filters, code_block, writer:)

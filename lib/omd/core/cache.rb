@@ -1,4 +1,4 @@
-class OMD::Cache
+class OMD::Core::Cache
   SELF = self
 
   def self.key(*parts)

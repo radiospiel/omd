@@ -26,7 +26,7 @@ module OMD::CLI
     file_to_display = nil
 
     source_files_newest_first(src).each do |path|
-      dest = OMD.process(path, clean: clean)
+      dest = OMD::Core.process(path, clean: clean)
       file_to_display ||= dest
     end
 

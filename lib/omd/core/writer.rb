@@ -1,7 +1,7 @@
-class OMD::Writer
+class OMD::Core::Writer
   def self.open(path)
     # tmp_name = "#{path}.#{$$}"
-    writer = new(OMD.dest_data_dir(path), path)
+    writer = new(OMD::Core.dest_data_dir(path), path)
     yield writer
     # File.rename(tmp_name, path)
   ensure
@@ -14,7 +14,7 @@ class OMD::Writer
     @fd = File.open(path, "w")
     @dir = dir
     @changes = []
-    @cache = ::OMD::Cache.new(@dir)
+    @cache = ::OMD::Core::Cache.new(@dir)
   end
 
   def close

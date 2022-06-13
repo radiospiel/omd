@@ -1,4 +1,4 @@
-class OMD::FileReader
+class OMD::Core::FileReader
   def self.open(file)
     new file
   end
