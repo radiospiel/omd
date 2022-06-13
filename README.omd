@@ -3,6 +3,7 @@ This document is intended for processing via the OMD markdown preprocessor
 https://github.com/radiospiel/omd
 ```
 
+
 ```{@bash}
 if ! which figlet > /dev/null ; then
   echo "Please install figlet via 'brew install figlet'" >&2
@@ -40,9 +41,7 @@ Currently *omd* supports the following types of code:
 - Ruby programs: they are executed, and their output is embedded verbatim in the output;
 - Graphviz dot scripts: they are rendered into images that then are embedded into the output;
 - svgbob diagrams: they are executed via svgbob (TODO: add link) and embedded as a SVG image.
-- SQL commands: they are executed via a psql session; the output is rendered into a table;
-
-Before we jump into explaining how one can use these modi it is time for a 
+- SQL commands: they are executed via a sqlite session, and, by default, the output is rendered into a table;
 
 ## SECURITY ANNOUNCEMENT
 

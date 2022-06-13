@@ -1,4 +1,5 @@
 
+
 ```
   ___  _       __  __         ____             _ 
  / _ \| |__   |  \/  |_   _  |  _ \  ___   ___| |
@@ -36,9 +37,7 @@ Currently *omd* supports the following types of code:
 - Ruby programs: they are executed, and their output is embedded verbatim in the output;
 - Graphviz dot scripts: they are rendered into images that then are embedded into the output;
 - svgbob diagrams: they are executed via svgbob (TODO: add link) and embedded as a SVG image.
-- SQL commands: they are executed via a psql session; the output is rendered into a table;
-
-Before we jump into explaining how one can use these modi it is time for a 
+- SQL commands: they are executed via a sqlite session, and, by default, the output is rendered into a table;
 
 ## SECURITY ANNOUNCEMENT
 
@@ -250,8 +249,8 @@ The result looks like this:
 fortune all
 ```
 ```
-A bore is someone who persists in holding his own views after we have
-enlightened him with ours.
+Life is a gamble at terrible odds, if it was a bet you wouldn't take it.
+		-- Tom Stoppard, "Rosencrantz and Guildenstern are Dead"
 ```
 
 ## SQL: the `{sql}` processing instruction
