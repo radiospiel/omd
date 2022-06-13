@@ -59,7 +59,7 @@ module OMD::Core
             # print code block. If the code block
             print_code_block(token, writer: writer)
 
-            writer.transaction(token) do
+            writer.transaction(token.to_stable_hash) do
               process_code_block(file_reader, token, writer: writer)
             end
           when FileReader::PlainInputLine

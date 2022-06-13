@@ -9,6 +9,10 @@ class OMD::Core::FileReader
 
     attr_reader :args, :body, :code, :embedded_files
 
+    def to_stable_hash
+      [args, body].inspect
+    end
+
     def initialize(args, body, code, embedded_files)
       @args = args
       @body = body
