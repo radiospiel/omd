@@ -1,3 +1,5 @@
+require "cgi"
+
 class OMD::Core::Writer
   def self.open(path)
     # tmp_name = "#{path}.#{$$}"
@@ -53,6 +55,10 @@ class OMD::Core::Writer
     @changes << [:code_block, body, lang]
   end
 
+  def small(str)
+    @changes << [:small, str]
+  end
+  
   # -- secondary ops --------------------------------------------------------
   # secondary ops are built off basic ops
 
@@ -83,7 +89,8 @@ class OMD::Core::Writer
     code_block body, lang: "error"
   end
 
-  def table(csv, separator:)
+  def table(csv, separator:, runtime: nil)
+    # TODO: This should probably use the CSV library
     csv.chomp!
     csv = "|#{csv.gsub("\n", "|\n|")}|"
     csv = csv.gsub(separator, " | ")
@@ -101,6 +108,17 @@ class OMD::Core::Writer
     line(sep)
 
     line(rest)
+    
+    info = []
+    rows = rest.split("\n").count
+    info << "#{rows} rows"
+    if runtime
+      info << ("runtime: %.2f secs" % runtime)
+    end
+    
+    unless info.empty?
+      small info.join(", ")
+    end
   end
 
   private
@@ -112,6 +130,10 @@ class OMD::Core::Writer
       when :line
         line, = *args
         @fd.puts line
+      when :small
+        str, = *args
+        @fd.puts "\n"
+        @fd.puts "<small>#{CGI.escapeHTML str}</small>" 
       when :code_block
         body, lang = *args
         @fd.puts <<~MD

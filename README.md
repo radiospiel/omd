@@ -38,6 +38,7 @@ Currently *omd* supports the following types of code:
 - Graphviz dot scripts: they are rendered into images that then are embedded into the output;
 - svgbob diagrams: they are executed via svgbob (TODO: add link) and embedded as a SVG image.
 - SQL commands: they are executed via a sqlite session, and, by default, the output is rendered into a table;
+- psql commands: they are executed the psql CLI, and, by default, the output is rendered into a table;
 
 ## SECURITY ANNOUNCEMENT
 
@@ -187,7 +188,7 @@ The following block is being run through svgbob. The graph is then embedded as a
 
 The result looks like this:
 
-![svgbob](./README.md.data/05ae8fa75507b859bd215aaa77deb58b.svg)
+![svgbob](./README.md.data/cfa80d4decbeade717798e0e3ee1095d.svg)
 
 
 ## Graphviz: the `{dot}` processing instruction
@@ -215,7 +216,7 @@ digraph finite_state_machine {
 	LR_1 -> LR_3 [ label = "S($start)" ];
 }
 ```
-![dot](./README.md.data/a976f85fb45e59aa8900341566a4be20.png)
+![dot](./README.md.data/2a05daa79b320ca4a257900675c26b07.png)
 
 ## mermaid: the `{mermaid}` processing instruction
 
@@ -249,8 +250,7 @@ The result looks like this:
 fortune all
 ```
 ```
-Life is a gamble at terrible odds, if it was a bet you wouldn't take it.
-		-- Tom Stoppard, "Rosencrantz and Guildenstern are Dead"
+YOU PICKED KARL MALDEN'S NOSE!!
 ```
 
 ## SQL: the `{sql}` processing instruction
@@ -276,15 +276,55 @@ SELECT
     SELECT value FROM generate_series(1, 6)
   ) subquery
 ```
+|value | square|
+|------|-------|
 |1 | 1|
-|--|--|
 |2 | 4|
 |3 | 9|
 |4 | 16|
 |5 | 25|
 |6 | 36|
 
+<small>6 rows, runtime: 0.02 secs</small>
+
 The SQL code is executed in a sqlite3 in-memory database.
+
+
+## PostgresQL: the `{psql}` processing instruction
+
+The following block is being executed as a SQL command:
+
+    ```{psql}
+    SELECT
+      value,
+      value * value * value AS cubed
+      FROM (
+        SELECT value FROM generate_series(-2, 3) value
+      ) subquery
+    ```
+
+The result looks like this:
+
+```psql
+SELECT
+  value,
+  value * value * value AS cubed
+  FROM (
+    SELECT value FROM generate_series(-2, 3) value
+  ) subquery
+```
+|value | cubed|
+|------|------|
+|-2 | -8|
+|-1 | -1|
+|0 | 0|
+|1 | 1|
+|2 | 8|
+|3 | 27|
+
+<small>6 rows, runtime: 0.02 secs</small>
+
+The SQL code is executed in your default postgresql database.
 
 ## Controlling the display mode
 

@@ -75,7 +75,28 @@ module OMD::Processors
     H.which! "sqlite3", "brew install sqlite3"
 
     File.write("omd.sql", code_block)
-    success = H.sh! "sqlite3 -noheader -separator $'\t' < omd.sql"
-    writer.table(success, separator: "\t")
+
+    success = nil
+    runtime = Benchmark.realtime do
+      success = H.sh! "sqlite3 -header -separator $'\t' < omd.sql"
+    end
+    writer.table(success, separator: "\t", runtime: runtime)
+  end
+
+  def psql(_filters, code_block, writer:)
+    H.which! "psql"
+
+    File.write "omd.psql",  <<~SQL
+      \\timing false
+      \\pset footer off
+      
+      COPY (#{code_block}) TO STDOUT WITH CSV HEADER NULL AS 'NULL';
+    SQL
+    
+    success = nil
+    runtime = Benchmark.realtime do
+      success = H.sh! "psql -q -f omd.psql"
+    end
+    writer.table(success, separator: ",", runtime: runtime)
   end
 end

@@ -42,6 +42,7 @@ Currently *omd* supports the following types of code:
 - Graphviz dot scripts: they are rendered into images that then are embedded into the output;
 - svgbob diagrams: they are executed via svgbob (TODO: add link) and embedded as a SVG image.
 - SQL commands: they are executed via a sqlite session, and, by default, the output is rendered into a table;
+- psql commands: they are executed the psql CLI, and, by default, the output is rendered into a table;
 
 ## SECURITY ANNOUNCEMENT
 
@@ -299,6 +300,33 @@ SELECT
 ```
 
 The SQL code is executed in a sqlite3 in-memory database.
+
+
+## PostgresQL: the `{psql}` processing instruction
+
+The following block is being executed as a SQL command:
+
+    ```{psql}
+    SELECT
+      value,
+      value * value * value AS cubed
+      FROM (
+        SELECT value FROM generate_series(-2, 3) value
+      ) subquery
+    ```
+
+The result looks like this:
+
+```{psql}
+SELECT
+  value,
+  value * value * value AS cubed
+  FROM (
+    SELECT value FROM generate_series(-2, 3) value
+  ) subquery
+```
+
+The SQL code is executed in your default postgresql database.
 
 ## Controlling the display mode
 

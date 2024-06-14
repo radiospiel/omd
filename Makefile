@@ -18,7 +18,7 @@ format:
 	rubocop -a bin lib
 
 install: dependencies
-	cp bin/omd /usr/local/bin
+# 	cp bin/omd /usr/local/bin
 
 dependencies:
 	which svgbob || cargo install svgbob_cli
