@@ -34,14 +34,15 @@ module OMD::H
   def sh!(cmd, raise_on_error: true, quiet: false)
     OMD.logger.debug "Running '#{cmd}'" unless quiet
     stdout_str, stderr_str, status = Open3.capture3(cmd)
-
+    
+    if stderr_str != ""
+      OMD.logger.error "When running '#{cmd}'"
+      OMD.logger.error stderr_str 
+    end
 
     return stdout_str if status.exitstatus == 0
     return stdout_str unless raise_on_error
     OMD.logger.warn "Running #{cmd} failed w/exit status #{status}"
-    if stderr_str != ""
-    OMD.logger.info stderr_str
-    end
 
     raise ShellError, stderr_str if raise_on_error
   end

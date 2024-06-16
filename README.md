@@ -250,7 +250,8 @@ The result looks like this:
 fortune all
 ```
 ```
-Let's just be friends and make no special effort to ever see each other again.
+When eating an elephant take one bite at a time.
+		-- Gen. C. Abrams
 ```
 
 ## SQL: the `{sql}` processing instruction
@@ -322,7 +323,7 @@ SELECT
 | 2 | 8 |
 | 3 | 27 |
 
-<small>6 rows, runtime: 0.01 secs</small>
+<small>6 rows, Time: 0.421 ms</small>
 
 The SQL code is executed in your default postgresql database.
 

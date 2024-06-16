@@ -107,7 +107,7 @@ class OMD::Core::Writer
     "| " + row.map { |v| escape_value(v) }.join(" | ") + " |"
   end
 
-  def table(csv, separator:, runtime: nil)
+  def table(csv, separator:, timing: nil)
     # Reminder: this is the Markdown table layout
     #
     # | Tables   |      Are      |  Cool |
@@ -130,9 +130,8 @@ class OMD::Core::Writer
     end
 
     info = []
-    # rows = rest.split("\n").count
     info << "#{rows.count - 1} rows"
-    info << ("runtime: %.2f secs" % runtime) if runtime
+    info << timing if timing
     small info.join(", ")
   end
 

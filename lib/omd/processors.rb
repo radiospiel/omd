@@ -76,27 +76,28 @@ module OMD::Processors
 
     File.write("omd.sql", code_block)
 
-    success = nil
+    stdout = nil
     runtime = Benchmark.realtime do
-      success = H.sh! "sqlite3 -header -separator $'\t' < omd.sql"
+      stdout = H.sh! "sqlite3 -header -separator $'\t' < omd.sql"
     end
-    writer.table(success, separator: "\t", runtime: runtime)
+    writer.table(stdout, separator: "\t", timing: ("runtime: %.2f secs" % runtime))
   end
 
   def psql(_filters, code_block, writer:)
     H.which! "psql"
 
     File.write "omd.psql",  <<~SQL
-      \\timing false
+      \\timing true
       \\pset footer off
       
       COPY (#{code_block}) TO STDOUT WITH CSV HEADER NULL AS 'NULL';
     SQL
     
-    success = nil
-    runtime = Benchmark.realtime do
-      success = H.sh! "psql -q -f omd.psql"
-    end
-    writer.table(success, separator: ",", runtime: runtime)
+    stdout = H.sh! "psql -q -f omd.psql -L /tmp/log.psql"
+      
+    stdout = stdout.split("\n")
+    timing = stdout.pop
+    stdout = stdout.join("\n")
+    writer.table(stdout, separator: ",", timing: timing)
   end
 end
