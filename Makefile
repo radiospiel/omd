@@ -17,9 +17,6 @@ watch:
 format:
 	rubocop -a bin lib
 
-install: dependencies
-# 	cp bin/omd /usr/local/bin
-
-dependencies:
-	which svgbob || cargo install svgbob_cli
-	which mmdc || npm install -g mermaid.cli
+current_dir := $(subst $(HOME),~,$(shell pwd))
+install:
+	@echo "Please add $(current_dir)/bin to your path"
