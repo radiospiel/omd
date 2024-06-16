@@ -1,4 +1,5 @@
 require "cgi"
+require "csv"
 
 class OMD::Core::Writer
   def self.open(path)
@@ -58,7 +59,7 @@ class OMD::Core::Writer
   def small(str)
     @changes << [:small, str]
   end
-  
+
   # -- secondary ops --------------------------------------------------------
   # secondary ops are built off basic ops
 
@@ -89,12 +90,27 @@ class OMD::Core::Writer
     code_block body, lang: "error"
   end
 
-  def table(csv, separator:, runtime: nil)
-    # TODO: This should probably use the CSV library
-    csv.chomp!
-    csv = "|#{csv.gsub("\n", "|\n|")}|"
-    csv = csv.gsub(separator, " | ")
+  def table_header(headers)
+    "| " + headers.join(" | ") + " |" + "\n" +
+    "| " + headers.map { '----'}.join(" | ") + " |"
+  end
 
+  def escape_value(v)
+    while v.end_with?("\n") do
+      v = v[0...-1]
+    end
+
+    v.gsub("_", "\\_")
+     .gsub("\n", "\\n")
+  end
+
+  def table_row(row)
+    "| " + map { |v| escape_value(v) }.join(" | ") + " |"
+  end
+
+  def table(csv, separator:, runtime: nil)
+    # Reminder: this is the Markdown table layout
+    #
     # | Tables   |      Are      |  Cool |
     # |----------|:-------------:|------:|
     #
@@ -102,23 +118,21 @@ class OMD::Core::Writer
     # | col 2 is |    centered   |   $12 |
     # | col 3 is | right-aligned |    $1 |
 
-    header, rest = csv.split("\n", 2)
-    line(header)
-    sep = header.gsub(/./) { |ch| ch == "|" ? "|" : "-" }
-    line(sep)
+    csv_table = CSV.parse(csv, col_sep: separator, headers: true)
 
-    line(rest)
-    
+    csv_table.each_with_index do |row, index|
+      if index == 0
+        line table_header(row)
+      else
+        line table_row(row)
+      end
+    end
+
     info = []
     rows = rest.split("\n").count
-    info << "#{rows} rows"
-    if runtime
-      info << ("runtime: %.2f secs" % runtime)
-    end
-    
-    unless info.empty?
-      small info.join(", ")
-    end
+    info << "#{rows.count} rows"
+    info << ("runtime: %.2f secs" % runtime) if runtime
+    small info.join(", ")
   end
 
   private
@@ -133,7 +147,7 @@ class OMD::Core::Writer
       when :small
         str, = *args
         @fd.puts "\n"
-        @fd.puts "<small>#{CGI.escapeHTML str}</small>" 
+        @fd.puts "<small>#{CGI.escapeHTML str}</small>"
       when :code_block
         body, lang = *args
         @fd.puts <<~MD
