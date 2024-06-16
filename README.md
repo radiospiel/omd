@@ -250,7 +250,7 @@ The result looks like this:
 fortune all
 ```
 ```
-YOU PICKED KARL MALDEN'S NOSE!!
+Let's just be friends and make no special effort to ever see each other again.
 ```
 
 ## SQL: the `{sql}` processing instruction
@@ -276,16 +276,16 @@ SELECT
     SELECT value FROM generate_series(1, 6)
   ) subquery
 ```
-|value | square|
-|------|-------|
-|1 | 1|
-|2 | 4|
-|3 | 9|
-|4 | 16|
-|5 | 25|
-|6 | 36|
+| value | square |
+| ---- | ---- |
+| 1 | 1 |
+| 2 | 4 |
+| 3 | 9 |
+| 4 | 16 |
+| 5 | 25 |
+| 6 | 36 |
 
-<small>6 rows, runtime: 0.02 secs</small>
+<small>6 rows, runtime: 0.01 secs</small>
 
 The SQL code is executed in a sqlite3 in-memory database.
 
@@ -313,16 +313,16 @@ SELECT
     SELECT value FROM generate_series(-2, 3) value
   ) subquery
 ```
-|value | cubed|
-|------|------|
-|-2 | -8|
-|-1 | -1|
-|0 | 0|
-|1 | 1|
-|2 | 8|
-|3 | 27|
+| value | cubed |
+| ---- | ---- |
+| -2 | -8 |
+| -1 | -1 |
+| 0 | 0 |
+| 1 | 1 |
+| 2 | 8 |
+| 3 | 27 |
 
-<small>6 rows, runtime: 0.02 secs</small>
+<small>6 rows, runtime: 0.01 secs</small>
 
 The SQL code is executed in your default postgresql database.
 

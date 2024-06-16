@@ -22,7 +22,7 @@ The following is a simple command:
     }
 
     int main(int argc, char** argv) {
-      int n = atoi(argv[1]);
+      int n = 20; // atoi(argv[1]);
       printf("Fibonacci number of %d is %d\n", n, fib(n));
     }
 ```

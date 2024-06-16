@@ -1,9 +1,13 @@
 .PHONY: examples/mixed.md
 
-all: examples/mixed.md
+all: readme examples/mixed.md
+
+readme:
+	rm -rf README.md*
+	bin/omd process --clean README.omd
 
 examples/mixed.md:
-	bin/omd process examples/mixed.omd --output=examples/mixed.md --clean
+	bin/omd process --clean examples/mixed.omd
 
 clean:
 	git rm -rf README.md.data/ || true

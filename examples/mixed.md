@@ -16,12 +16,12 @@ int fib(int n) {
 }
 
 int main(int argc, char** argv) {
-  int n = atoi(argv[1]);
+  int n = 20; // atoi(argv[1]);
   printf("Fibonacci number of %d is %d\n", n, fib(n));
 }
 ```
 ```
-Fibonacci number of 10 is 55
+Fibonacci number of 20 is 6765
 ```
 
 This code is pretty straight forward - but what does it communicate?
@@ -40,8 +40,8 @@ end
 ```
 ```ruby
        user     system      total        real
-+=  0.117288   0.097441   0.214729 (  0.215222)
-<<  0.000552   0.000406   0.000958 (  0.000957)
++=  0.020091   0.034472   0.054563 (  0.054956)
+<<  0.000101   0.000053   0.000154 (  0.000155)
 ```
 
 and some SQL:
@@ -52,16 +52,3 @@ FROM
   generate_series(1, 4) as a(aa),
   generate_series(1, 2) as b(b)
 ```
-|aa | b|
-|---|--|
-|1 | 1|
-|1 | 2|
-|2 | 1|
-|2 | 2|
-|3 | 1|
-|3 | 2|
-|4 | 1|
-|4 | 2|
-|(8 rows)|
-
-![dot](./mixed.md.data/103f410ad870907981094f0ad1f82f48.png)
