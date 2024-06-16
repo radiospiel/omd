@@ -90,9 +90,8 @@ class OMD::Core::Writer
     code_block body, lang: "error"
   end
 
-  def table_header(headers)
-    "| " + headers.join(" | ") + " |" + "\n" +
-    "| " + headers.map { '----'}.join(" | ") + " |"
+  def table_sep(headers)
+    "| " + headers.map { '----' }.join(" | ") + " |"
   end
 
   def escape_value(v)
@@ -105,7 +104,7 @@ class OMD::Core::Writer
   end
 
   def table_row(row)
-    "| " + map { |v| escape_value(v) }.join(" | ") + " |"
+    "| " + row.map { |v| escape_value(v) }.join(" | ") + " |"
   end
 
   def table(csv, separator:, runtime: nil)
@@ -119,18 +118,20 @@ class OMD::Core::Writer
     # | col 3 is | right-aligned |    $1 |
 
     csv_table = CSV.parse(csv, col_sep: separator, headers: true)
+    rows = csv_table.to_a
 
-    csv_table.each_with_index do |row, index|
+    rows.each_with_index do |row, index|
       if index == 0
-        line table_header(row)
+        line table_row(row)
+        line table_sep(row)
       else
         line table_row(row)
       end
     end
 
     info = []
-    rows = rest.split("\n").count
-    info << "#{rows.count} rows"
+    # rows = rest.split("\n").count
+    info << "#{rows.count - 1} rows"
     info << ("runtime: %.2f secs" % runtime) if runtime
     small info.join(", ")
   end
